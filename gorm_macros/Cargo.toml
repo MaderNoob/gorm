@@ -14,3 +14,4 @@ syn = { version = "1.0.95", features = ["full"] }
 quote = "1.0.18"
 proc_macro_roids = "0.7.0"
 darling = "0.14.1"
+itertools = "0.10.3"

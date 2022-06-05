@@ -1,14 +1,11 @@
 use darling::{FromDeriveInput, FromField};
+use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use proc_macro_roids::DeriveInputStructExt;
 use quote::{quote, quote_spanned};
-use syn::{
-    parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Colon2, DeriveInput,
-    Fields, Path, PathSegment, Type, TypePath, Visibility,
-};
+use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Type};
 
-#[proc_macro_derive(Table)]
+#[proc_macro_derive(Table, attributes(table))]
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input_tokens as DeriveInput);
     let input = TableInput::from_derive_input(&derive_input).unwrap();
@@ -16,6 +13,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         ident,
         generics,
         data,
+        table_name,
     } = input;
 
     if !generics.params.is_empty() {
@@ -33,17 +31,40 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         .into();
     }
 
-    let field_infos = fields.iter().map(|field| field.field_info());
+    let field_names = fields.iter().map(|field| &field.ident);
+    let field_types = fields.iter().map(|field| &field.ty).unique();
+    let table_field_structs = fields.iter().map(|field| field.generate_table_field_struct());
+    let fields_type = generate_fields_cons_list_type(&fields);
 
     return quote! {
+        #[automatically_derived]
         impl ::gorm::Table for #ident {
-            fn fields() -> &'static [::gorm::FieldInfo] {
-                &[
-                    #(#field_infos),*
-                ]
+            type Fields = #fields_type;
+            const FIELDS: &'static [::gorm::TableField] = &[
+                #( #table_field_structs ),*
+            ];
+            const TABLE_NAME: &'static ::std::primitive::str = #table_name;
+        }
+
+        #[automatically_derived]
+        impl<'a, R: ::gorm::sqlx::Row> ::gorm::sqlx::FromRow<'a, R> for #ident
+        where
+            &'a ::std::primitive::str: ::gorm::sqlx::ColumnIndex<R>,
+            #(
+                #field_types: ::gorm::sqlx::decode::Decode<'a, R::Database>,
+                #field_types: ::gorm::sqlx::types::Type<R::Database>
+            ),*
+        {
+            fn from_row(row: &'a R) -> ::gorm::sqlx::Result<Self> {
+                ::std::result::Result::Ok(#ident {
+                    #(
+                        #field_names: row.try_get(stringify!(#field_names))?
+                     ),*
+                })
             }
         }
-    }.into();
+    }
+    .into();
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -52,6 +73,7 @@ struct TableInput {
     ident: Ident,
     generics: syn::Generics,
     data: darling::ast::Data<(), TableInputField>,
+    table_name: String,
 }
 
 #[derive(Debug, FromField)]
@@ -59,16 +81,65 @@ struct TableInput {
 struct TableInputField {
     ident: Option<Ident>,
     ty: Type,
+    primary_key: darling::util::Flag,
 }
-impl TableInputField {
-    fn field_info(&self) -> proc_macro2::TokenStream {
+impl TableInputField{
+    fn generate_table_field_struct(&self)->proc_macro2::TokenStream{
+        // it is safe to unwrap here since only named fields are allowed.
         let name = self.ident.as_ref().unwrap();
+        let is_primary_key = self.primary_key.is_present();
         let ty = &self.ty;
-        quote! {
-            ::gorm::FieldInfo{
+        let sql_type_name = if is_primary_key{
+            quote!{
+                <<#ty as ::gorm::IntoSqlSerialType>::SqlSerialType as ::gorm::SqlType>::SQL_NAME
+            }
+        }else{
+            quote!{
+                <<#ty as ::gorm::IntoSqlType>::SqlType as ::gorm::SqlType>::SQL_NAME
+            }
+        };
+        quote!{
+            ::gorm::TableField {
                 name: stringify!(#name),
-                ty: <#ty as ::gorm::IntoSqlType>::SQL_TYPE,
+                is_primary_key: #is_primary_key,
+                sql_type_name: #sql_type_name
             }
         }
     }
+}
+
+fn generate_field_name_cons_list_type(field_name: &str) -> proc_macro2::TokenStream {
+    // start with the inner most type and wrap it each time with each character.
+    let mut cur = quote! { ::gorm::TypedConsListNil };
+
+    for chr in field_name.chars().rev() {
+        cur = quote! {
+            ::gorm::FieldNameCharsConsListCons<#chr, #cur>
+        };
+    }
+
+    cur
+}
+
+fn generate_fields_cons_list_type(
+    fields: &darling::ast::Fields<TableInputField>,
+) -> proc_macro2::TokenStream {
+    // start with the inner most type and wrap it each time with each field.
+    let mut cur = quote! { ::gorm::TypedConsListNil };
+
+    for field in fields.iter().rev() {
+        // safe to unwrap here because only structs with named fields are allowed.
+        let field_name = field.ident.as_ref().unwrap().to_string();
+        let field_name_type = generate_field_name_cons_list_type(&field_name);
+        let field_type = &field.ty;
+        cur = quote! {
+            ::gorm::FieldsConsListCons<
+                #field_name_type,
+                #field_type,
+                #cur
+            >
+        };
+    }
+
+    cur
 }

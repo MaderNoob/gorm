@@ -7,8 +7,10 @@ edition = "2021"
 
 [workspace]
 members = [
-	"gorm_macros"
+	"gorm_macros",
+	"gorm_test"
 ]
 
 [dependencies]
 gorm_macros = { path = "gorm_macros" }
+sqlx = { version = "0.5.13", features = ["runtime-tokio-rustls"] }
