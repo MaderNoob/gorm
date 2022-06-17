@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Add};
 
 pub use gorm_macros::Table;
 pub use sqlx;
@@ -45,13 +45,18 @@ pub trait Table: Sized {
     const TABLE_NAME: &'static str;
 
     /// Returns a create table statement for this table
-    fn create_table_statement() -> CreateTableStatement<Self> {
+    fn create_table() -> CreateTableStatement<Self> {
         CreateTableStatement(PhantomData)
     }
 
     /// Returns a drop table statement for this table
-    fn drop_table_statement() -> DropTableStatement<Self> {
+    fn drop_table() -> DropTableStatement<Self> {
         DropTableStatement(PhantomData)
+    }
+
+    /// Find records in the table
+    fn find() -> FindStatement<Self> {
+        FindStatement(PhantomData)
     }
 }
 
@@ -72,8 +77,9 @@ impl<T: Table> CreateTableStatement<T> {
 }
 
 impl<T: Table> SqlStatement for CreateTableStatement<T> {
-    fn to_sql_string(self) -> String {
-        format!(
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
             "CREATE TABLE {} ({})",
             T::TABLE_NAME,
             generate_create_table_columns_sql_string(T::FIELDS)
@@ -84,8 +90,9 @@ impl<T: Table> SqlStatement for CreateTableStatement<T> {
 /// An sql create table if not exists statement
 pub struct CreateTableIfNotExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
-    fn to_sql_string(self) -> String {
-        format!(
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
             "CREATE TABLE IF NOT EXISTS {} ({})",
             T::TABLE_NAME,
             generate_create_table_columns_sql_string(T::FIELDS)
@@ -101,6 +108,8 @@ fn generate_create_table_columns_sql_string(fields: &[TableField]) -> String {
         fields_string.push_str(&field_info.sql_type_name);
         if field_info.is_primary_key {
             fields_string.push_str(" PRIMARY KEY");
+        } else {
+            fields_string.push_str(" NOT NULL");
         }
         fields_string.push(',');
     }
@@ -122,29 +131,79 @@ impl<T: Table> DropTableStatement<T> {
     }
 }
 impl<T: Table> SqlStatement for DropTableStatement<T> {
-    fn to_sql_string(self) -> String {
-        format!(
-            "DROP TABLE {}",
-            T::TABLE_NAME
-        )
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "DROP TABLE {}", T::TABLE_NAME)
     }
 }
 
 /// An sql drop table if exists statement
 pub struct DropTableIfExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for DropTableIfExistsStatement<T> {
-    fn to_sql_string(self) -> String {
-        format!(
-            "DROP TABLE IF EXISTS {}",
-            T::TABLE_NAME
-        )
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "DROP TABLE IF EXISTS {}", T::TABLE_NAME)
     }
+}
+
+/// An sql create table if not exists statement
+pub struct FindStatement<T: Table>(PhantomData<T>);
+impl<T: Table> FindStatement<T> {
+    pub fn filter<C: WhereCondition>(self, condition: C) -> FilterStatement<T, C> {
+        FilterStatement {
+            condition,
+            phantom: PhantomData,
+        }
+    }
+}
+
+pub struct FilterStatement<T: Table, C: WhereCondition> {
+    condition: C,
+    phantom: PhantomData<T>,
 }
 
 /// An sql statement which can be executed on the database.
 pub trait SqlStatement {
-    /// Converts the sql statement to an sql string which can be executed on the database.
-    fn to_sql_string(self) -> String;
+    /// Writes the sql statement as an sql string which can be executed on the database.
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
+}
+
+/// A column of a table
+pub trait Column<T: Table> {
+    const COLUMN_NAME: &'static str;
+}
+
+/// An collection of tables from which records are being selected.
+pub trait SelectableTables {}
+
+/// A marker traits which indicates that a list of tables contains some table.
+pub trait SelectableTablesContains<T: Table>: SelectableTablesConsListItem {}
+
+// each cons item contains its current element, and all elements contained in its next items.
+impl<T: Table, Next: SelectableTablesConsListItem> SelectableTablesContains<T>
+    for SelectableTablesConsListCons<T, Next>
+{
+}
+impl<T: Table, Next: SelectableTablesConsListItem, T2: Table> SelectableTablesContains<T2>
+    for SelectableTablesConsListCons<T, Next>
+where
+    Next: SelectableTablesContains<T2>,
+{
+}
+
+pub trait SqlExpression<T: SelectableTablesConsListItem> {
+    /// Writes the sql statement as an sql string which can be executed on the database.
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
+}
+
+impl<T: Table, C: Column<T>> SqlExpression<T> for C {
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "\"{}\".\"{}\"", T::TABLE_NAME, C::COLUMN_NAME,)
+    }
+}
+
+/// A condition in a where clause.
+pub trait WhereCondition {
+    /// Writes the condition as an sql string which can be used in a where clause.
+    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
 }
 
 /// An sql type.
@@ -199,7 +258,6 @@ define_sql_types! {
     SqlF32, "real" => f32,
     SqlF64, "double precision" => f64,
     Text, "text" => String,
-    Binary, "bytea" => Vec<u8>,
     [serial] Serial16, "smallserial" => i16 ,
     [serial] Serial32, "serial" => i32,
     [serial] Serial64, "bigserial" => i64,

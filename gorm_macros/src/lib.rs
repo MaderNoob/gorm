@@ -1,3 +1,4 @@
+use convert_case::{Casing, Case};
 use darling::{FromDeriveInput, FromField};
 use itertools::Itertools;
 use proc_macro::TokenStream;
@@ -33,8 +34,17 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     let field_names = fields.iter().map(|field| &field.ident);
     let field_types = fields.iter().map(|field| &field.ty).unique();
-    let table_field_structs = fields.iter().map(|field| field.generate_table_field_struct());
+    let table_field_structs = fields
+        .iter()
+        .map(|field| field.generate_table_field_struct());
     let fields_type = generate_fields_cons_list_type(&fields);
+
+    let table_name_ident = Ident::new(&table_name, proc_macro2::Span::call_site());
+
+    let column_structs = fields.iter().map(|field| {
+        // it is safe to unwrap here since only named fields are allowed
+        generate_column_struct(field.ident.as_ref().unwrap(), &ident)
+    });
 
     return quote! {
         #[automatically_derived]
@@ -63,6 +73,13 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
                 })
             }
         }
+
+        #[allow(non_upper_case_globals)]
+        mod #table_name_ident {
+            #(
+                #column_structs
+             )*
+        }
     }
     .into();
 }
@@ -83,22 +100,22 @@ struct TableInputField {
     ty: Type,
     primary_key: darling::util::Flag,
 }
-impl TableInputField{
-    fn generate_table_field_struct(&self)->proc_macro2::TokenStream{
+impl TableInputField {
+    fn generate_table_field_struct(&self) -> proc_macro2::TokenStream {
         // it is safe to unwrap here since only named fields are allowed.
         let name = self.ident.as_ref().unwrap();
         let is_primary_key = self.primary_key.is_present();
         let ty = &self.ty;
-        let sql_type_name = if is_primary_key{
-            quote!{
+        let sql_type_name = if is_primary_key {
+            quote! {
                 <<#ty as ::gorm::IntoSqlSerialType>::SqlSerialType as ::gorm::SqlType>::SQL_NAME
             }
-        }else{
-            quote!{
+        } else {
+            quote! {
                 <<#ty as ::gorm::IntoSqlType>::SqlType as ::gorm::SqlType>::SQL_NAME
             }
         };
-        quote!{
+        quote! {
             ::gorm::TableField {
                 name: stringify!(#name),
                 is_primary_key: #is_primary_key,
@@ -142,4 +159,17 @@ fn generate_fields_cons_list_type(
     }
 
     cur
+}
+
+fn generate_column_struct(column_name_ident: &Ident, table_struct_ident: &Ident) -> proc_macro2::TokenStream {
+    let column_name = column_name_ident.to_string();
+    let column_struct_name = column_name.to_case(Case::Pascal);
+    let column_struct_name_ident = Ident::new(&column_struct_name, proc_macro2::Span::call_site());
+    quote! {
+        pub struct #column_struct_name_ident;
+        impl ::gorm::Column<super::#table_struct_ident> for #column_struct_name_ident {
+            const COLUMN_NAME:&'static str = #column_name;
+        }
+        pub const #column_name_ident: #column_struct_name_ident = #column_struct_name_ident;
+    }
 }
