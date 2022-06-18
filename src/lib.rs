@@ -1,4 +1,7 @@
-use std::{marker::PhantomData, ops::Add};
+#![feature(auto_traits)]
+#![feature(negative_impls)]
+
+use std::marker::PhantomData;
 
 pub use gorm_macros::Table;
 pub use sqlx;
@@ -167,36 +170,60 @@ pub trait SqlStatement {
 }
 
 /// A column of a table
-pub trait Column<T: Table> {
+pub trait Column {
     const COLUMN_NAME: &'static str;
+    type Table: Table;
 }
 
-/// An collection of tables from which records are being selected.
+auto trait TypesNotEqual {}
+impl<T> !TypesNotEqual for (T, T) {}
+
+/// A list of tables from which columns can be used in an sql expression.
 pub trait SelectableTables {}
 
 /// A marker traits which indicates that a list of tables contains some table.
-pub trait SelectableTablesContains<T: Table>: SelectableTablesConsListItem {}
+pub trait SelectableTablesContains<T: Table>: SelectableTables {}
 
-// each cons item contains its current element, and all elements contained in its next items.
-impl<T: Table, Next: SelectableTablesConsListItem> SelectableTablesContains<T>
-    for SelectableTablesConsListCons<T, Next>
-{
-}
-impl<T: Table, Next: SelectableTablesConsListItem, T2: Table> SelectableTablesContains<T2>
-    for SelectableTablesConsListCons<T, Next>
+pub struct SelectableTablesCons<T: Table, N: SelectableTables>(PhantomData<T>, PhantomData<N>);
+
+impl<T: Table> SelectableTables for T {}
+impl<T: Table> SelectableTablesContains<T> for T {}
+
+impl<T: Table, N: SelectableTables> SelectableTables for SelectableTablesCons<T, N> {}
+impl<T: Table, N: SelectableTables> SelectableTablesContains<T> for SelectableTablesCons<T, N> {}
+impl<T: Table, N: SelectableTables, InnerT: Table> SelectableTablesContains<InnerT>
+    for SelectableTablesCons<T, N>
 where
-    Next: SelectableTablesContains<T2>,
+    N: SelectableTablesContains<InnerT>,
+    (T, InnerT): TypesNotEqual,
 {
 }
 
-pub trait SqlExpression<T: SelectableTablesConsListItem> {
+struct Student;
+impl Table for Student {
+    type Fields = TypedConsListNil;
+
+    const FIELDS: &'static [TableField] = &[];
+
+    const TABLE_NAME: &'static str = "student";
+}
+
+pub trait SqlExpression<T> {
     /// Writes the sql statement as an sql string which can be executed on the database.
     fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
 }
 
-impl<T: Table, C: Column<T>> SqlExpression<T> for C {
+impl<S: SelectableTables, C: Column> SqlExpression<S> for C
+where
+    S: SelectableTablesContains<<C as Column>::Table>,
+{
     fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "\"{}\".\"{}\"", T::TABLE_NAME, C::COLUMN_NAME,)
+        write!(
+            f,
+            "\"{}\".\"{}\"",
+            <<C as Column>::Table as Table>::TABLE_NAME,
+            C::COLUMN_NAME,
+        )
     }
 }
 

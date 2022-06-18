@@ -7,7 +7,7 @@ fn main() {
 
 #[derive(Table)]
 #[table(table_name = "person")]
-struct Person {
+pub struct Person {
     #[table(primary_key)]
     id: i32,
     name: String,

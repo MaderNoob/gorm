@@ -167,8 +167,9 @@ fn generate_column_struct(column_name_ident: &Ident, table_struct_ident: &Ident)
     let column_struct_name_ident = Ident::new(&column_struct_name, proc_macro2::Span::call_site());
     quote! {
         pub struct #column_struct_name_ident;
-        impl ::gorm::Column<super::#table_struct_ident> for #column_struct_name_ident {
+        impl ::gorm::Column for #column_struct_name_ident {
             const COLUMN_NAME:&'static str = #column_name;
+            type Table = super::#table_struct_ident;
         }
         pub const #column_name_ident: #column_struct_name_ident = #column_struct_name_ident;
     }
