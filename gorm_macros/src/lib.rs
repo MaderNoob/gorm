@@ -43,14 +43,14 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     let column_structs = fields.iter().map(|field| {
         // it is safe to unwrap here since only named fields are allowed
-        generate_column_struct(field.ident.as_ref().unwrap(), &ident)
+        generate_column_struct(field.ident.as_ref().unwrap(), &field.ty, &ident)
     });
 
     return quote! {
         #[automatically_derived]
-        impl ::gorm::Table for #ident {
+        impl ::gorm::table::Table for #ident {
             type Fields = #fields_type;
-            const FIELDS: &'static [::gorm::TableField] = &[
+            const FIELDS: &'static [::gorm::table::TableField] = &[
                 #( #table_field_structs ),*
             ];
             const TABLE_NAME: &'static ::std::primitive::str = #table_name;
@@ -108,15 +108,15 @@ impl TableInputField {
         let ty = &self.ty;
         let sql_type_name = if is_primary_key {
             quote! {
-                <<#ty as ::gorm::IntoSqlSerialType>::SqlSerialType as ::gorm::SqlType>::SQL_NAME
+                <<#ty as ::gorm::types::IntoSqlSerialType>::SqlSerialType as ::gorm::types::SqlSerialType>::SQL_NAME
             }
         } else {
             quote! {
-                <<#ty as ::gorm::IntoSqlType>::SqlType as ::gorm::SqlType>::SQL_NAME
+                <<#ty as ::gorm::types::IntoSqlType>::SqlType as ::gorm::types::SqlType>::SQL_NAME
             }
         };
         quote! {
-            ::gorm::TableField {
+            ::gorm::table::TableField {
                 name: stringify!(#name),
                 is_primary_key: #is_primary_key,
                 sql_type_name: #sql_type_name
@@ -127,11 +127,11 @@ impl TableInputField {
 
 fn generate_field_name_cons_list_type(field_name: &str) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each character.
-    let mut cur = quote! { ::gorm::TypedConsListNil };
+    let mut cur = quote! { ::gorm::fields_list::TypedConsListNil };
 
     for chr in field_name.chars().rev() {
         cur = quote! {
-            ::gorm::FieldNameCharsConsListCons<#chr, #cur>
+            ::gorm::fields_list::FieldNameCharsConsListCons<#chr, #cur>
         };
     }
 
@@ -142,7 +142,7 @@ fn generate_fields_cons_list_type(
     fields: &darling::ast::Fields<TableInputField>,
 ) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each field.
-    let mut cur = quote! { ::gorm::TypedConsListNil };
+    let mut cur = quote! { ::gorm::fields_list::TypedConsListNil };
 
     for field in fields.iter().rev() {
         // safe to unwrap here because only structs with named fields are allowed.
@@ -150,7 +150,7 @@ fn generate_fields_cons_list_type(
         let field_name_type = generate_field_name_cons_list_type(&field_name);
         let field_type = &field.ty;
         cur = quote! {
-            ::gorm::FieldsConsListCons<
+            ::gorm::fields_list::FieldsConsListCons<
                 #field_name_type,
                 #field_type,
                 #cur
@@ -161,15 +161,17 @@ fn generate_fields_cons_list_type(
     cur
 }
 
-fn generate_column_struct(column_name_ident: &Ident, table_struct_ident: &Ident) -> proc_macro2::TokenStream {
+fn generate_column_struct(column_name_ident: &Ident, column_type: &Type, table_struct_ident: &Ident) -> proc_macro2::TokenStream {
     let column_name = column_name_ident.to_string();
     let column_struct_name = column_name.to_case(Case::Pascal);
     let column_struct_name_ident = Ident::new(&column_struct_name, proc_macro2::Span::call_site());
     quote! {
         pub struct #column_struct_name_ident;
-        impl ::gorm::Column for #column_struct_name_ident {
+        impl ::gorm::table::Column for #column_struct_name_ident {
             const COLUMN_NAME:&'static str = #column_name;
             type Table = super::#table_struct_ident;
+            type SqlType = <#column_type as ::gorm::types::IntoSqlType>::SqlType;
+            type RustType = #column_type;
         }
         pub const #column_name_ident: #column_struct_name_ident = #column_struct_name_ident;
     }

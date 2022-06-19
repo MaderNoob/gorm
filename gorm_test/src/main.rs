@@ -1,4 +1,3 @@
-use gorm::SqlStatement;
 use gorm::Table;
 
 fn main() {
@@ -13,5 +12,3 @@ pub struct Person {
     name: String,
     age: i32,
 }
-
-
