@@ -2,7 +2,7 @@ use std::{fmt::Display, marker::PhantomData};
 
 use crate::{
     selectable_tables::{CombineSelectableTables, CombinedSelectableTables, SelectableTables},
-    table::{Table, TableMarker},
+    table::{HasForeignKey, Table, TableMarker, Column},
 };
 
 use super::SelectStatement;
@@ -51,6 +51,7 @@ impl<A: SelectFrom, B: SelectFrom> InnerJoined<A, B> {
 impl<A: SelectFrom, B: SelectFrom> SelectFrom for InnerJoined<A, B>
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
+    A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
 {
     type SelectableTables = CombinedSelectableTables<A::SelectableTables, B::SelectableTables>;
 
@@ -64,9 +65,10 @@ where
     fn write_sql_from_string_without_left(f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            " inner join \"{}\" on condition_for({},{})",
+            " inner join \"{}\" on \"{}\".\"{}\" = \"{}\".\"id\"",
             B::LeftMostTable::TABLE_NAME,
-            Self::LeftMostTable::TABLE_NAME,
+            A::LeftMostTable::TABLE_NAME,
+            <<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::COLUMN_NAME,
             B::LeftMostTable::TABLE_NAME
         )?;
 
@@ -74,22 +76,12 @@ where
     }
 }
 
-/// A formatter which formats the from part of an sql query for some `SelectFrom`.
-pub struct SelectFromFormatter<S: SelectFrom>(PhantomData<S>);
-impl<S: SelectFrom> SelectFromFormatter<S> {
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-impl<S: SelectFrom> Display for SelectFromFormatter<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        S::write_sql_from_string(f)
-    }
-}
-
 pub trait InnerJoinTrait: Sized + SelectFrom {
     /// Inner joins this table with another table
-    fn inner_join<S: SelectFrom>(self, _with: S) -> InnerJoined<Self, S> {
+    fn inner_join<S: SelectFrom>(self, _with: S) -> InnerJoined<Self, S>
+    where
+        Self::LeftMostTable: HasForeignKey<S::LeftMostTable>,
+    {
         InnerJoined::new()
     }
 }

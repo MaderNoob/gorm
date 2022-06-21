@@ -1,3 +1,4 @@
+use convert_case::{Case, Casing};
 use darling::{FromDeriveInput, FromField};
 use itertools::Itertools;
 use proc_macro::TokenStream;
@@ -10,11 +11,14 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input_tokens as DeriveInput);
     let input = TableInput::from_derive_input(&derive_input).unwrap();
     let TableInput {
-        ident,
+        ident: table_struct_ident,
         generics,
         data,
-        table_name,
+        table_name: optional_table_name,
     } = input;
+
+    let table_name =
+        optional_table_name.unwrap_or_else(|| table_struct_ident.to_string().to_case(Case::Snake));
 
     if !generics.params.is_empty() {
         return quote_spanned! {
@@ -31,6 +35,18 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         .into();
     }
 
+    // make sure there is a field named id
+    if fields
+        .iter()
+        .find(|field| field.ident.as_ref().unwrap().to_string() == "id")
+        .is_none()
+    {
+        return quote_spanned! {
+            derive_input.span() => compile_error!("table struct must have a field named \"id\"");
+        }
+        .into();
+    };
+
     let field_names = fields.iter().map(|field| &field.ident);
     let field_types = fields.iter().map(|field| &field.ty).unique();
     let table_field_structs = fields
@@ -38,27 +54,43 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         .map(|field| field.generate_table_field_struct());
     let fields_type = generate_fields_cons_list_type(&fields);
 
-    let table_name_ident = Ident::new(&table_name, proc_macro2::Span::call_site());
+    let table_name_ident = Ident::new(&table_name, table_struct_ident.span());
 
     let column_structs = fields.iter().map(|field| {
         // it is safe to unwrap here since only named fields are allowed
-        generate_column_struct(field.ident.as_ref().unwrap(), &field.ty, &ident)
+        generate_column_struct(
+            field.ident.as_ref().unwrap(),
+            &field.ty,
+            &table_struct_ident,
+        )
     });
 
-    let table_marker = generate_table_marker(&ident);
+    let table_marker = generate_table_marker(&table_struct_ident);
+
+    let foreign_key_impls = fields.iter().filter_map(|field| {
+        let foreign_key_to_table_name = field.foreign_key.as_ref()?;
+
+        Some(generate_foreign_key_impl(
+            &table_struct_ident,
+            &table_name_ident,
+            &foreign_key_to_table_name,
+            field.ident.as_ref().unwrap(),
+        ))
+    });
 
     return quote! {
         #[automatically_derived]
-        impl ::gorm::table::Table for #ident {
+        impl ::gorm::table::Table for #table_struct_ident {
             type Fields = #fields_type;
             const FIELDS: &'static [::gorm::table::TableField] = &[
                 #( #table_field_structs ),*
             ];
             const TABLE_NAME: &'static ::std::primitive::str = #table_name;
+            type IdColumn = #table_name_ident::id;
         }
 
         #[automatically_derived]
-        impl<'a, R: ::gorm::sqlx::Row> ::gorm::sqlx::FromRow<'a, R> for #ident
+        impl<'a, R: ::gorm::sqlx::Row> ::gorm::sqlx::FromRow<'a, R> for #table_struct_ident
         where
             &'a ::std::primitive::str: ::gorm::sqlx::ColumnIndex<R>,
             #(
@@ -67,13 +99,17 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             ),*
         {
             fn from_row(row: &'a R) -> ::gorm::sqlx::Result<Self> {
-                ::std::result::Result::Ok(#ident {
+                ::std::result::Result::Ok(#table_struct_ident {
                     #(
                         #field_names: row.try_get(stringify!(#field_names))?
                      ),*
                 })
             }
         }
+
+        #(
+            #foreign_key_impls
+         )*
 
         #[allow(non_camel_case_types)]
         mod #table_name_ident {
@@ -93,7 +129,7 @@ struct TableInput {
     ident: Ident,
     generics: syn::Generics,
     data: darling::ast::Data<(), TableInputField>,
-    table_name: String,
+    table_name: Option<String>,
 }
 
 #[derive(Debug, FromField)]
@@ -101,13 +137,13 @@ struct TableInput {
 struct TableInputField {
     ident: Option<Ident>,
     ty: Type,
-    primary_key: darling::util::Flag,
+    foreign_key: Option<String>,
 }
 impl TableInputField {
     fn generate_table_field_struct(&self) -> proc_macro2::TokenStream {
         // it is safe to unwrap here since only named fields are allowed.
         let name = self.ident.as_ref().unwrap();
-        let is_primary_key = self.primary_key.is_present();
+        let is_primary_key = name.to_string() == "id";
         let ty = &self.ty;
         let sql_type_name = if is_primary_key {
             quote! {
@@ -164,10 +200,16 @@ fn generate_fields_cons_list_type(
     cur
 }
 
-fn generate_column_struct(column_name_ident: &Ident, column_type: &Type, table_struct_ident: &Ident) -> proc_macro2::TokenStream {
+fn generate_column_struct(
+    column_name_ident: &Ident,
+    column_type: &Type,
+    table_struct_ident: &Ident,
+) -> proc_macro2::TokenStream {
     let column_name = column_name_ident.to_string();
     quote! {
         pub struct #column_name_ident;
+
+        #[automatically_derived]
         impl ::gorm::table::Column for #column_name_ident {
             const COLUMN_NAME:&'static str = #column_name;
             type Table = super::#table_struct_ident;
@@ -180,8 +222,34 @@ fn generate_column_struct(column_name_ident: &Ident, column_type: &Type, table_s
 fn generate_table_marker(table_struct_ident: &Ident) -> proc_macro2::TokenStream {
     quote! {
         pub struct table;
+
+        #[automatically_derived]
         impl ::gorm::table::TableMarker for table {
             type Table = super::#table_struct_ident;
         }
     }
 }
+
+fn generate_foreign_key_impl(
+    table_struct_ident: &Ident,
+    table_name_ident: &Ident,
+    other_table_name: &str,
+    foreign_key_column_ident: &Ident,
+) -> proc_macro2::TokenStream {
+    let other_table_ident = Ident::new(other_table_name, foreign_key_column_ident.span());
+
+    quote! {
+        #[automatically_derived]
+        impl ::gorm::table::HasForeignKey<#other_table_ident> for #table_struct_ident {
+            type ForeignKeyColumn = #table_name_ident::#foreign_key_column_ident;
+        }
+    }
+}
+
+/*
+ *
+/// Indicates that some table has a foreign key to some other table
+pub trait HasForeignKey<T: Table>: Table {
+    type ForeignKeyColumn: Column;
+}
+*/

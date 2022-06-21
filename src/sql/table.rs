@@ -9,6 +9,7 @@ pub trait Table: Sized {
     type Fields: FieldsConsListItem;
     const FIELDS: &'static [TableField];
     const TABLE_NAME: &'static str;
+    type IdColumn: Column;
 }
 
 /// Information about a field of a table struct
@@ -40,4 +41,9 @@ pub trait TableMarker: Sized {
     fn drop_table(self) -> DropTableStatement<Self::Table> {
         DropTableStatement::new()
     }
+}
+
+/// Indicates that some table has a foreign key to some other table
+pub trait HasForeignKey<T: Table>: Table {
+    type ForeignKeyColumn: Column<SqlType = <T::IdColumn as Column>::SqlType>;
 }
