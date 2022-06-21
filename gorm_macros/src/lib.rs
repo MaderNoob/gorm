@@ -1,4 +1,3 @@
-use convert_case::{Casing, Case};
 use darling::{FromDeriveInput, FromField};
 use itertools::Itertools;
 use proc_macro::TokenStream;
@@ -46,6 +45,8 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         generate_column_struct(field.ident.as_ref().unwrap(), &field.ty, &ident)
     });
 
+    let table_marker = generate_table_marker(&ident);
+
     return quote! {
         #[automatically_derived]
         impl ::gorm::table::Table for #ident {
@@ -74,11 +75,13 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             }
         }
 
-        #[allow(non_upper_case_globals)]
+        #[allow(non_camel_case_types)]
         mod #table_name_ident {
             #(
                 #column_structs
              )*
+
+            #table_marker
         }
     }
     .into();
@@ -163,16 +166,22 @@ fn generate_fields_cons_list_type(
 
 fn generate_column_struct(column_name_ident: &Ident, column_type: &Type, table_struct_ident: &Ident) -> proc_macro2::TokenStream {
     let column_name = column_name_ident.to_string();
-    let column_struct_name = column_name.to_case(Case::Pascal);
-    let column_struct_name_ident = Ident::new(&column_struct_name, proc_macro2::Span::call_site());
     quote! {
-        pub struct #column_struct_name_ident;
-        impl ::gorm::table::Column for #column_struct_name_ident {
+        pub struct #column_name_ident;
+        impl ::gorm::table::Column for #column_name_ident {
             const COLUMN_NAME:&'static str = #column_name;
             type Table = super::#table_struct_ident;
             type SqlType = <#column_type as ::gorm::types::IntoSqlType>::SqlType;
             type RustType = #column_type;
         }
-        pub const #column_name_ident: #column_struct_name_ident = #column_struct_name_ident;
+    }
+}
+
+fn generate_table_marker(table_struct_ident: &Ident) -> proc_macro2::TokenStream {
+    quote! {
+        pub struct table;
+        impl ::gorm::table::TableMarker for table {
+            type Table = super::#table_struct_ident;
+        }
     }
 }
