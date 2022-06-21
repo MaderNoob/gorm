@@ -16,6 +16,7 @@ pub trait Table: Sized {
 pub struct TableField {
     pub name: &'static str,
     pub is_primary_key: bool,
+    pub foreign_key_to_table_name: Option<&'static str>,
     pub sql_type_name: &'static str,
 }
 
@@ -33,12 +34,12 @@ pub trait TableMarker: Sized {
     type Table: Table;
 
     /// Returns a create table statement for this table
-    fn create_table(self) -> CreateTableStatement<Self::Table> {
+    fn create(self) -> CreateTableStatement<Self::Table> {
         CreateTableStatement::new()
     }
 
     /// Returns a drop table statement for this table
-    fn drop_table(self) -> DropTableStatement<Self::Table> {
+    fn drop(self) -> DropTableStatement<Self::Table> {
         DropTableStatement::new()
     }
 }

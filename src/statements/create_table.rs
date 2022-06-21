@@ -16,7 +16,7 @@ impl<T: Table> CreateTableStatement<T> {
 }
 
 impl<T: Table> SqlStatement for CreateTableStatement<T> {
-    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "CREATE TABLE {} ({})",
@@ -29,7 +29,7 @@ impl<T: Table> SqlStatement for CreateTableStatement<T> {
 /// An sql create table if not exists statement
 pub struct CreateTableIfNotExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
-    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "CREATE TABLE IF NOT EXISTS {} ({})",
@@ -50,6 +50,14 @@ fn generate_create_table_columns_sql_string(fields: &[TableField]) -> String {
         } else {
             fields_string.push_str(" NOT NULL");
         }
+
+        if let Some(foreign_key_to_table_name) = field_info.foreign_key_to_table_name{
+            fields_string.push_str(" REFERENCES ");
+            fields_string.push('"');
+            fields_string.push_str(foreign_key_to_table_name);
+            fields_string.push('"');
+        }
+
         fields_string.push(',');
     }
 

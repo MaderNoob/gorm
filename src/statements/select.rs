@@ -1,17 +1,13 @@
 use std::marker::PhantomData;
 
-use super::{select_from::SelectFrom, SelectFromFormatter, SqlStatement};
-use crate::{condition::SqlCondition, table::{Table, TableMarker}};
+use super::{select_from::SelectFrom, SqlStatement};
+use crate::condition::SqlCondition;
 
 /// An sql statement for finding records in a table
 pub struct SelectStatement<S: SelectFrom>(PhantomData<S>);
 impl<S: SelectFrom> SelectStatement<S> {
     pub fn new() -> Self {
         Self(PhantomData)
-    }
-
-    pub fn sql_from_string(self) -> String {
-        SelectFromFormatter::<S>::new().to_string()
     }
 
     pub fn filter<C: SqlCondition<<S as SelectFrom>::SelectableTables>>(
@@ -24,9 +20,10 @@ impl<S: SelectFrom> SelectStatement<S> {
         }
     }
 }
-impl<T: TableMarker> SqlStatement for SelectStatement<T> {
-    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "SELECT * FROM \"{}\"", T::Table::TABLE_NAME)
+impl<S: SelectFrom> SqlStatement for SelectStatement<S> {
+    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "SELECT * FROM ")?;
+        S::write_sql_from_string(f)
     }
 }
 

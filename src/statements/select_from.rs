@@ -65,7 +65,7 @@ where
     fn write_sql_from_string_without_left(f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            " inner join \"{}\" on \"{}\".\"{}\" = \"{}\".\"id\"",
+            " INNER JOIN \"{}\" ON \"{}\".\"{}\" = \"{}\".\"id\"",
             B::LeftMostTable::TABLE_NAME,
             A::LeftMostTable::TABLE_NAME,
             <<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::COLUMN_NAME,

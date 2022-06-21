@@ -1,11 +1,16 @@
+use gorm::table::TableMarker;
 use gorm::InnerJoinTrait;
 use gorm::SelectFrom;
+use gorm::SqlStatement;
 use gorm::Table;
 
 fn main() {
-    let x = person::table
-        .inner_join(school::table)
-        .find();
+    let c2 = school::table.create();
+    println!("{}", c2.formatter());
+    let c = person::table.create();
+    println!("{}", c.formatter());
+    let query = person::table.inner_join(school::table).find();
+    println!("{}", query.formatter());
 }
 
 #[derive(Table)]

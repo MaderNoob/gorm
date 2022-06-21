@@ -15,7 +15,7 @@ impl<T: Table> DropTableStatement<T> {
     }
 }
 impl<T: Table> SqlStatement for DropTableStatement<T> {
-    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "DROP TABLE {}", T::TABLE_NAME)
     }
 }
@@ -23,7 +23,7 @@ impl<T: Table> SqlStatement for DropTableStatement<T> {
 /// An sql drop table if exists statement
 pub struct DropTableIfExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for DropTableIfExistsStatement<T> {
-    fn write_sql_string(self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "DROP TABLE IF EXISTS {}", T::TABLE_NAME)
     }
 }

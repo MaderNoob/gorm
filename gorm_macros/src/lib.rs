@@ -154,11 +154,22 @@ impl TableInputField {
                 <<#ty as ::gorm::types::IntoSqlType>::SqlType as ::gorm::types::SqlType>::SQL_NAME
             }
         };
+        let foreign_key_to_table_name = match &self.foreign_key {
+            Some(foreign_key_table_struct_name) => {
+                let foreign_key_table_struct_ident = Ident::new(&foreign_key_table_struct_name, self.ident.span());
+                quote! {
+                    Some(<#foreign_key_table_struct_ident as ::gorm::Table>::TABLE_NAME)
+                }
+            }
+            None => quote! { None },
+        };
+
         quote! {
             ::gorm::table::TableField {
                 name: stringify!(#name),
                 is_primary_key: #is_primary_key,
-                sql_type_name: #sql_type_name
+                foreign_key_to_table_name: #foreign_key_to_table_name,
+                sql_type_name: #sql_type_name,
             }
         }
     }
