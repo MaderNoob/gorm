@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use super::{select_from::SelectFrom, SqlStatement};
-use crate::condition::SqlCondition;
+use crate::{condition::SqlCondition, table::TableMarker, Table};
 
 /// An sql statement for finding records in a table
 pub struct SelectStatement<S: SelectFrom>(PhantomData<S>);
@@ -20,10 +20,11 @@ impl<S: SelectFrom> SelectStatement<S> {
         }
     }
 }
-impl<S: SelectFrom> SqlStatement for SelectStatement<S> {
+impl<T: TableMarker> SqlStatement for SelectStatement<T> {
+    type OutputFields = <T::Table as Table>::Fields;
+
     fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "SELECT * FROM ")?;
-        S::write_sql_from_string(f)
+        write!(f, "SELECT * FROM \"{}\"", <T::Table as Table>::TABLE_NAME)
     }
 }
 

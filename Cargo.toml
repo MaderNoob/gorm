@@ -14,6 +14,8 @@ members = [
 [dependencies]
 gorm_macros = { path = "gorm_macros" }
 sqlx = { version = "0.5.13", features = ["runtime-tokio-rustls"] }
+async-trait = "0.1.56"
+thiserror = "1.0.31"
 
 [features]
 mssql = ["sqlx/mssql"]

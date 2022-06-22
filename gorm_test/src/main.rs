@@ -1,15 +1,32 @@
+use gorm::pool::DatabaseConnectionPool;
+use gorm::sqlx::Postgres;
 use gorm::table::TableMarker;
-use gorm::InnerJoinTrait;
+use gorm::ExecuteSqlStatment;
 use gorm::SelectFrom;
 use gorm::SqlStatement;
 use gorm::Table;
 
-fn main() {
-    let c2 = school::table.create();
-    println!("{}", c2.formatter());
-    let c = person::table.create();
-    println!("{}", c.formatter());
-    let query = person::table.inner_join(school::table).find();
+#[tokio::main]
+async fn main() {
+    let pool = DatabaseConnectionPool::<Postgres>::connect(
+        "postgres://postgres:postgres@localhost/gorm_test",
+    )
+    .await
+    .unwrap();
+    school::table
+        .create()
+        .if_not_exists()
+        .execute(&pool)
+        .await
+        .unwrap();
+    person::table
+        .create()
+        .if_not_exists()
+        .execute(&pool)
+        .await
+        .unwrap();
+    //let query = person::table.inner_join(school::table).find();
+    let query = person::table.find();
     println!("{}", query.formatter());
 }
 

@@ -1,11 +1,11 @@
 use crate::{
     fields_list::FieldsConsListItem,
-    statements::{CreateTableStatement, DropTableStatement, InnerJoined, SelectFrom},
+    statements::{CreateTableStatement, DropTableStatement},
     types::SqlType,
 };
 
 /// A table in the database.
-pub trait Table: Sized {
+pub trait Table: Sized + 'static {
     type Fields: FieldsConsListItem;
     const FIELDS: &'static [TableField];
     const TABLE_NAME: &'static str;
@@ -30,7 +30,7 @@ pub trait Column {
 
 /// A trait for representing a table marker, which is an empty type which is used to reference a
 /// table.
-pub trait TableMarker: Sized {
+pub trait TableMarker: Sized + 'static {
     type Table: Table;
 
     /// Returns a create table statement for this table

@@ -13,7 +13,7 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
     type SqlType: SqlType;
     type RustType;
 
-    /// Writes the sql statement as an sql string which can be executed on the database.
+    /// Writes the sql expression as an sql string which can be evaluated by the database.
     fn write_sql_string(
         &self,
         f: &mut std::fmt::Formatter,

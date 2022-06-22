@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{table::{Table, TableField}, statements::SqlStatement};
+use crate::{table::{Table, TableField}, statements::SqlStatement, fields_list::TypedConsListNil};
 
 /// An sql create table statement
 pub struct CreateTableStatement<T: Table>(PhantomData<T>);
@@ -16,6 +16,8 @@ impl<T: Table> CreateTableStatement<T> {
 }
 
 impl<T: Table> SqlStatement for CreateTableStatement<T> {
+    type OutputFields = TypedConsListNil;
+
     fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -29,6 +31,8 @@ impl<T: Table> SqlStatement for CreateTableStatement<T> {
 /// An sql create table if not exists statement
 pub struct CreateTableIfNotExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
+    type OutputFields = TypedConsListNil;
+
     fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,

@@ -1,4 +1,4 @@
-use std::{fmt::Display, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::{
     selectable_tables::{CombineSelectableTables, CombinedSelectableTables, SelectableTables},

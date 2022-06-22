@@ -49,6 +49,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     let field_names = fields.iter().map(|field| &field.ident);
     let field_types = fields.iter().map(|field| &field.ty).unique();
+    let field_types2 = field_types.clone();
     let table_field_structs = fields
         .iter()
         .map(|field| field.generate_table_field_struct());
@@ -107,6 +108,18 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             }
         }
 
+        #[automatically_derived]
+        impl<'a, R: ::gorm::sqlx::Row> ::gorm::from_query_result::FromQueryResult<'a, R> for #table_struct_ident
+        where 
+            &'a ::std::primitive::str: ::gorm::sqlx::ColumnIndex<R>,
+            #(
+                #field_types2: ::gorm::sqlx::decode::Decode<'a, R::Database>,
+                #field_types2: ::gorm::sqlx::types::Type<R::Database>
+            ),*
+        {
+            type Fields = #fields_type;
+        }
+
         #(
             #foreign_key_impls
          )*
@@ -156,7 +169,8 @@ impl TableInputField {
         };
         let foreign_key_to_table_name = match &self.foreign_key {
             Some(foreign_key_table_struct_name) => {
-                let foreign_key_table_struct_ident = Ident::new(&foreign_key_table_struct_name, self.ident.span());
+                let foreign_key_table_struct_ident =
+                    Ident::new(&foreign_key_table_struct_name, self.ident.span());
                 quote! {
                     Some(<#foreign_key_table_struct_ident as ::gorm::Table>::TABLE_NAME)
                 }
