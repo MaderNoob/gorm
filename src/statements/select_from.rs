@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     selectable_tables::{CombineSelectableTables, CombinedSelectableTables, SelectableTables},
-    table::{HasForeignKey, Table, TableMarker, Column},
+    table::{Column, HasForeignKey, Table, TableMarker},
 };
 
 use super::SelectStatement;

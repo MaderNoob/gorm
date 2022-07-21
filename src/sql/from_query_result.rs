@@ -1,19 +1,36 @@
-use sqlx::{FromRow, Row};
+use tokio_postgres::Row;
 
-use crate::fields_list::{FieldsConsListItem, TypedConsListNil};
+use crate::{fields_list::{FieldsConsListItem, TypedConsListNil}, error::*};
 
 /// A type that can be built from an sql query result.
-pub trait FromQueryResult<'a, R: Row>: FromRow<'a, R> {
+pub trait FromQueryResult: Sized{
     type Fields: FieldsConsListItem;
+
+    fn from_row(row: Row)->Result<Self>;
 }
 
 /// An empty query result.
 pub struct EmptyQueryResult;
-impl<'a, R: Row> FromQueryResult<'a, R> for EmptyQueryResult {
+impl FromQueryResult for EmptyQueryResult {
     type Fields = TypedConsListNil;
-}
-impl<'a, R: Row> FromRow<'a, R> for EmptyQueryResult {
-    fn from_row(_row: &'a R) -> Result<Self, sqlx::Error> {
+
+    fn from_row(row: Row)->Result<Self> {
         Ok(Self)
+    }
+}
+
+struct Person{
+    name: String,
+    age: u32,
+}
+
+impl FromQueryResult for Person{
+    type Fields = TypedConsListNil;
+
+    fn from_row(row: Row)->Result<Self> {
+        Ok(Self{
+            name: row.try_get("name").map_err(Error::FailedToGetColumn)?,
+            age: row.try_get("age")?,
+        })
     }
 }

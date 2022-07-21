@@ -1,7 +1,7 @@
-use sqlx::{database::HasArguments, query::QueryAs, Database, Encode, Type};
+use std::fmt::Write;
 
 use crate::{
-    bound_parameters::BoundParametersFormatter,
+    bound_parameters::ParameterBinder,
     condition::SqlConditionEq,
     selectable_tables::{SelectableTables, SelectableTablesContains},
     table::{Column, Table},
@@ -14,31 +14,21 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
     type RustType;
 
     /// Writes the sql expression as an sql string which can be evaluated by the database.
-    fn write_sql_string(
-        &self,
-        f: &mut std::fmt::Formatter,
-        bound_parameters_formatter: &mut impl BoundParametersFormatter,
-    ) -> std::fmt::Result;
-
-    /// Binds the parameters of this sql expression
-    fn bind_parameters<'s, 'q, DB: Database, O>(
+    fn write_sql_string<'s, 'a>(
         &'s self,
-        q: QueryAs<'q, DB, O, <DB as HasArguments<'q>>::Arguments>,
-    ) -> QueryAs<'q, DB, O, <DB as HasArguments<'q>>::Arguments>
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
     where
-        Self::RustType: Type<DB> + Encode<'q, DB>,
-        's: 'q,
-    {
-        q
-    }
+        's: 'a;
 
     /// Returns a condition which will be true if the given expression it equal to this one.
     // only allow equality for expression with the same value type
     fn eq<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
-        &self,
-        _other: O,
+        self,
+        other: O,
     ) -> SqlConditionEq<S, Self, O> {
-        SqlConditionEq::new()
+        SqlConditionEq::new(self, other)
     }
 }
 
@@ -50,11 +40,14 @@ where
     type SqlType = <C as Column>::SqlType;
     type RustType = <C as Column>::RustType;
 
-    fn write_sql_string(
-        &self,
-        f: &mut std::fmt::Formatter,
-        _bound_parameters_formatter: &mut impl BoundParametersFormatter,
-    ) -> std::fmt::Result {
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
         write!(
             f,
             "\"{}\".\"{}\"",
@@ -72,26 +65,19 @@ macro_rules! impl_primitive_expression{
                 type SqlType = <$t as IntoSqlType>::SqlType;
                 type RustType = $t;
 
-                fn write_sql_string(
-                    &self,
-                    f: &mut std::fmt::Formatter,
-                    bound_parameters_formatter: &mut impl BoundParametersFormatter
-                ) -> std::fmt::Result {
+                fn write_sql_string<'s, 'a>(
+                    &'s self,
+                    f: &mut String,
+                    parameter_binder: &mut ParameterBinder<'a>,
+                ) -> std::fmt::Result
+                where
+                    's: 'a,
+                {
                     write!(
                         f,
                         "{}",
-                        bound_parameters_formatter.format_next_bound_parameter()
+                        parameter_binder.bind_parameter(self)
                     )
-                }
-
-                fn bind_parameters<'s, 'q, DB: Database, O>(
-                    &'s self,
-                    q: QueryAs<'q, DB, O, <DB as HasArguments<'q>>::Arguments>,
-                ) -> QueryAs<'q, DB, O, <DB as HasArguments<'q>>::Arguments>
-                    where Self::RustType: sqlx::Encode<'q, DB> + sqlx::Type<DB>,
-                          's: 'q
-                {
-                    q.bind(self)
                 }
             }
         )+

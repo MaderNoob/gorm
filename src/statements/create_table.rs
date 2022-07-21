@@ -1,6 +1,12 @@
+use std::fmt::Write;
 use std::marker::PhantomData;
 
-use crate::{table::{Table, TableField}, statements::SqlStatement, fields_list::TypedConsListNil};
+use crate::{
+    bound_parameters::ParameterBinder,
+    fields_list::TypedConsListNil,
+    statements::SqlStatement,
+    table::{Table, TableField},
+};
 
 /// An sql create table statement
 pub struct CreateTableStatement<T: Table>(PhantomData<T>);
@@ -18,7 +24,14 @@ impl<T: Table> CreateTableStatement<T> {
 impl<T: Table> SqlStatement for CreateTableStatement<T> {
     type OutputFields = TypedConsListNil;
 
-    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
         write!(
             f,
             "CREATE TABLE {} ({})",
@@ -33,7 +46,14 @@ pub struct CreateTableIfNotExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
     type OutputFields = TypedConsListNil;
 
-    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
         write!(
             f,
             "CREATE TABLE IF NOT EXISTS {} ({})",
@@ -55,7 +75,7 @@ fn generate_create_table_columns_sql_string(fields: &[TableField]) -> String {
             fields_string.push_str(" NOT NULL");
         }
 
-        if let Some(foreign_key_to_table_name) = field_info.foreign_key_to_table_name{
+        if let Some(foreign_key_to_table_name) = field_info.foreign_key_to_table_name {
             fields_string.push_str(" REFERENCES ");
             fields_string.push('"');
             fields_string.push_str(foreign_key_to_table_name);

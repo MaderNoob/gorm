@@ -1,6 +1,10 @@
+use std::fmt::Write;
 use std::marker::PhantomData;
 
-use crate::{table::Table, statements::SqlStatement, fields_list::TypedConsListNil};
+use crate::{
+    bound_parameters::ParameterBinder, fields_list::TypedConsListNil, statements::SqlStatement,
+    table::Table,
+};
 
 /// An sql drop table statement
 pub struct DropTableStatement<T: Table>(PhantomData<T>);
@@ -17,7 +21,14 @@ impl<T: Table> DropTableStatement<T> {
 impl<T: Table> SqlStatement for DropTableStatement<T> {
     type OutputFields = TypedConsListNil;
 
-    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
         write!(f, "DROP TABLE {}", T::TABLE_NAME)
     }
 }
@@ -27,8 +38,14 @@ pub struct DropTableIfExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for DropTableIfExistsStatement<T> {
     type OutputFields = TypedConsListNil;
 
-    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
         write!(f, "DROP TABLE IF EXISTS {}", T::TABLE_NAME)
     }
 }
-

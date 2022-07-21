@@ -1,14 +1,12 @@
-use gorm::pool::DatabaseConnectionPool;
-use gorm::sqlx::Postgres;
+use gorm::connection::DatabaseConnection;
 use gorm::table::TableMarker;
 use gorm::ExecuteSqlStatment;
 use gorm::SelectFrom;
-use gorm::SqlStatement;
 use gorm::Table;
 
 #[tokio::main]
 async fn main() {
-    let pool = DatabaseConnectionPool::<Postgres>::connect(
+    let client = DatabaseConnection::connect(
         "postgres://postgres:postgres@localhost/gorm_test",
     )
     .await
@@ -16,21 +14,24 @@ async fn main() {
     school::table
         .create()
         .if_not_exists()
-        .execute(&pool)
+        .execute(&client)
         .await
         .unwrap();
     person::table
         .create()
         .if_not_exists()
-        .execute(&pool)
+        .execute(&client)
         .await
         .unwrap();
-    //let query = person::table.inner_join(school::table).find();
-    let query = person::table.find();
-    println!("{}", query.formatter());
+    let p = person::table
+        .find()
+        .load_optional::<Person>(&client)
+        .await
+        .unwrap();
+    println!("{:?}", p);
 }
 
-#[derive(Table)]
+#[derive(Debug, Table)]
 pub struct Person {
     id: i32,
     name: String,
@@ -40,7 +41,7 @@ pub struct Person {
     school_id: i32,
 }
 
-#[derive(Table)]
+#[derive(Debug, Table)]
 pub struct School {
     id: i32,
     name: String,

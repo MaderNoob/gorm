@@ -48,8 +48,6 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     };
 
     let field_names = fields.iter().map(|field| &field.ident);
-    let field_types = fields.iter().map(|field| &field.ty).unique();
-    let field_types2 = field_types.clone();
     let table_field_structs = fields
         .iter()
         .map(|field| field.generate_table_field_struct());
@@ -91,33 +89,19 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         }
 
         #[automatically_derived]
-        impl<'a, R: ::gorm::sqlx::Row> ::gorm::sqlx::FromRow<'a, R> for #table_struct_ident
-        where
-            &'a ::std::primitive::str: ::gorm::sqlx::ColumnIndex<R>,
-            #(
-                #field_types: ::gorm::sqlx::decode::Decode<'a, R::Database>,
-                #field_types: ::gorm::sqlx::types::Type<R::Database>
-            ),*
-        {
-            fn from_row(row: &'a R) -> ::gorm::sqlx::Result<Self> {
-                ::std::result::Result::Ok(#table_struct_ident {
-                    #(
-                        #field_names: row.try_get(stringify!(#field_names))?
-                     ),*
-                })
-            }
-        }
-
-        #[automatically_derived]
-        impl<'a, R: ::gorm::sqlx::Row> ::gorm::from_query_result::FromQueryResult<'a, R> for #table_struct_ident
-        where 
-            &'a ::std::primitive::str: ::gorm::sqlx::ColumnIndex<R>,
-            #(
-                #field_types2: ::gorm::sqlx::decode::Decode<'a, R::Database>,
-                #field_types2: ::gorm::sqlx::types::Type<R::Database>
-            ),*
+        impl ::gorm::from_query_result::FromQueryResult for #table_struct_ident
         {
             type Fields = #fields_type;
+            
+            fn from_row(row: ::gorm::tokio_postgres::row::Row) -> ::gorm::Result<Self>{
+                Ok(
+                    Self{
+                        #(
+                            #field_names: row.try_get(stringify!(#field_names)).map_err(::gorm::Error::FailedToGetColumn)?
+                         ),*
+                    }
+                )
+            }
         }
 
         #(

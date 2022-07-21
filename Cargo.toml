@@ -13,12 +13,8 @@ members = [
 
 [dependencies]
 gorm_macros = { path = "gorm_macros" }
-sqlx = { version = "0.5.13", features = ["runtime-tokio-rustls"] }
+tokio-postgres = "0.7.6"
 async-trait = "0.1.56"
 thiserror = "1.0.31"
-
-[features]
-mssql = ["sqlx/mssql"]
-mysql = ["sqlx/mysql"]
-postgres = ["sqlx/postgres"]
-sqlite = ["sqlx/sqlite"]
+futures = "0.3.21"
+tokio = { version = "1.20.0", features = ["rt"] }

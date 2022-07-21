@@ -1,9 +1,13 @@
+mod condition;
 mod create_table;
 mod drop_table;
 mod select;
 mod select_from;
 
-use crate::error::*;
+use crate::{
+    bound_parameters::ParameterBinder, error::*, fields_list::TypedConsListNil,
+    from_query_result::FromQueryResult, util::TypesNotEqual, ExecuteResult,
+};
 use std::fmt::Display;
 
 use async_trait::async_trait;
@@ -20,32 +24,39 @@ pub trait SqlStatement: Sized + 'static {
     type OutputFields: FieldsConsListItem;
 
     /// Writes the sql statement as an sql string which can be executed by a database.
-    fn write_sql_string(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result;
-
-    /// Returns a formatter for this sql statement which implmenets the `Display` trait for it, and
-    /// when displayed, writes the sql string corresponding with this statement.
-    fn formatter(&self) -> SqlStatementFormatter<Self> {
-        SqlStatementFormatter { statement: self }
-    }
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a;
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 pub trait ExecuteSqlStatment: SqlStatement {
     /// Executes the query on the given executor
-    async fn execute<E: SqlStatementExecutor>(self, on: E) -> Result<()> {
+    async fn execute(
+        self,
+        on: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<ExecuteResult> {
         on.execute(self).await
     }
-}
 
-#[async_trait(?Send)]
-impl<S: SqlStatement> ExecuteSqlStatment for S {}
+    async fn load_one<O: FromQueryResult>(
+        self,
+        on: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<O> {
+        on.load_one(self).await
+    }
 
-/// An sql statement formatter which implemented `Display` for some sql statement type.
-pub struct SqlStatementFormatter<'a, S: SqlStatement> {
-    statement: &'a S,
-}
-impl<'a, S: SqlStatement> Display for SqlStatementFormatter<'a, S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.statement.write_sql_string(f)
+    async fn load_optional<O: FromQueryResult>(
+        self,
+        on: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<Option<O>> {
+        on.load_optional(self).await
     }
 }
+
+#[async_trait]
+impl<S: SqlStatement> ExecuteSqlStatment for S {}

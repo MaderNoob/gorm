@@ -1,36 +1,85 @@
-use crate::error::*;
+use std::future::Future;
+
+use crate::{
+    bound_parameters::ParameterBinder, error::*, from_query_result::FromQueryResult, ExecuteResult,
+    SqlStatement,
+};
 use async_trait::async_trait;
-use sqlx::{Connection, Database, Executor};
+use tokio_postgres::{Client, NoTls};
 
 use super::SqlStatementExecutor;
 
-/// An asynchronous pool of database connections.
-pub struct DatabaseConnection<DB: Database> {
-    connection: DB::Connection,
+/// An database connection.
+pub struct DatabaseConnection {
+    client: Client,
 }
 
-impl<DB: Database> DatabaseConnection<DB> {
+impl DatabaseConnection {
     /// Establish a new database connection.
     pub async fn connect(url: &str) -> Result<Self> {
-        let connection = DB::Connection::connect(url).await?;
-        Ok(Self { connection })
-    }
+        let (client, connection) = tokio_postgres::connect(url, NoTls).await?;
 
-    /// Establish a new database connection with the provided options.
-    pub async fn connect_with(options: &<DB::Connection as Connection>::Options) -> Result<Self> {
-        let connection = DB::Connection::connect_with(&options).await?;
-        Ok(Self { connection })
+        // the connection must be awaited, run it in the background
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                panic!("database connection error: {}", e);
+            }
+        });
+
+        Ok(Self { client })
     }
 }
 
-#[async_trait(?Send)]
-impl<'a,DB: Database> SqlStatementExecutor for &'a mut DatabaseConnection<DB>
-where
-    for<'c> &'c mut DB::Connection: Executor<'c>,
-{
-    async fn execute(self, statement: impl crate::SqlStatement) -> Result<()> {
-        let query_string = format!("{}", statement.formatter());
-        self.connection.execute(query_string.as_str()).await?;
-        Ok(())
+#[async_trait]
+impl SqlStatementExecutor for DatabaseConnection {
+    async fn execute(&self, statement: impl crate::SqlStatement + Send) -> Result<ExecuteResult> {
+        let mut parameter_binder = ParameterBinder::new();
+        let mut query_string = String::new();
+        statement
+            .write_sql_string(&mut query_string, &mut parameter_binder)
+            .unwrap();
+        let rows_modified = self
+            .client
+            .execute(&query_string, parameter_binder.parameters())
+            .await?;
+
+        Ok(ExecuteResult { rows_modified })
+    }
+
+    async fn load_one<O: FromQueryResult, S: SqlStatement + Send>(
+        &self,
+        statement: S,
+    ) -> Result<O> {
+        let mut parameter_binder = ParameterBinder::new();
+        let mut query_string = String::new();
+        statement
+            .write_sql_string(&mut query_string, &mut parameter_binder)
+            .unwrap();
+        let row = self
+            .client
+            .query_one(&query_string, parameter_binder.parameters())
+            .await?;
+
+        Ok(O::from_row(row)?)
+    }
+
+    async fn load_optional<O: FromQueryResult, S: SqlStatement + Send>(
+        &self,
+        statement: S,
+    ) -> Result<Option<O>> {
+        let mut parameter_binder = ParameterBinder::new();
+        let mut query_string = String::new();
+        statement
+            .write_sql_string(&mut query_string, &mut parameter_binder)
+            .unwrap();
+        let maybe_row = self
+            .client
+            .query_opt(&query_string, parameter_binder.parameters())
+            .await?;
+
+        match maybe_row {
+            Some(row) => Ok(Some(O::from_row(row)?)),
+            None => Ok(None),
+        }
     }
 }

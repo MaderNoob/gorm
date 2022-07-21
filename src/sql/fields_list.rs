@@ -36,4 +36,3 @@ impl<const CHAR: char, Next: FieldNameCharsConsListItem> FieldNameCharsConsListI
 pub struct TypedConsListNil;
 impl FieldsConsListItem for TypedConsListNil {}
 impl FieldNameCharsConsListItem for TypedConsListNil {}
-
