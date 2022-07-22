@@ -1,3 +1,5 @@
+use gorm::InnerJoinTrait;
+use gorm::expr::OrderableSqlExpression;
 use gorm::expr::SqlExpression;
 use gorm::connection::DatabaseConnection;
 use gorm::table::TableMarker;
@@ -25,8 +27,9 @@ async fn main() {
         .await
         .unwrap();
     let p = person::table
+        .inner_join(school::table)
         .find()
-        .filter(person::name.eq("avi"))
+        .filter(school::id.greater_equals(1))
         .load_all::<Person>(&client)
         .await
         .unwrap();

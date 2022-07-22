@@ -3,7 +3,11 @@ use std::marker::PhantomData;
 
 use super::SqlStatement;
 use crate::{
-    bound_parameters::ParameterBinder, condition::SqlCondition, table::{TableMarker, HasForeignKey, Column}, Table, selectable_tables::{CombinedSelectableTables, CombineSelectableTables, SelectableTables},
+    bound_parameters::ParameterBinder,
+    condition::SqlCondition,
+    selectable_tables::{CombineSelectableTables, CombinedSelectableTables, SelectableTables},
+    table::{Column, HasForeignKey, TableMarker},
+    Table,
 };
 
 /// An sql statement for finding records in a table
@@ -32,7 +36,8 @@ impl<T: TableMarker> SqlStatement for SelectStatement<T> {
         _parameter_binder: &mut ParameterBinder<'a>,
     ) -> std::fmt::Result
     where
-        's: 'a{
+        's: 'a,
+    {
         write!(f, "SELECT * FROM \"{}\"", <T::Table as Table>::TABLE_NAME)
     }
 }
@@ -46,10 +51,10 @@ pub struct FilteredSelectStatement<
     phantom: PhantomData<S>,
 }
 
-impl<T: TableMarker, C: SqlCondition<<T as SelectFrom>::SelectableTables> + 'static> SqlStatement
-    for FilteredSelectStatement<T, C>
+impl<S: SelectFrom + 'static, C: SqlCondition<S::SelectableTables> + 'static> SqlStatement
+    for FilteredSelectStatement<S, C>
 {
-    type OutputFields = <T::Table as Table>::Fields;
+    type OutputFields = <S::LeftMostTable as Table>::Fields;
 
     fn write_sql_string<'s, 'a>(
         &'s self,
@@ -61,11 +66,11 @@ impl<T: TableMarker, C: SqlCondition<<T as SelectFrom>::SelectableTables> + 'sta
     {
         write!(
             f,
-            "SELECT * FROM \"{}\" where ",
-            <T::Table as Table>::TABLE_NAME
+            "SELECT * FROM "
         )?;
-        self.condition
-            .write_sql_string(f, parameter_binder)
+        S::write_sql_from_string(f)?;
+        write!(f," where ")?;
+        self.condition.write_sql_string(f, parameter_binder)
     }
 }
 
@@ -77,12 +82,12 @@ pub trait SelectFrom: Sized {
     type LeftMostTable: Table;
 
     /// Writes the `from` part of the sql query as an sql string.
-    fn write_sql_from_string(f: &mut std::fmt::Formatter) -> std::fmt::Result;
+    fn write_sql_from_string(f: &mut String) -> std::fmt::Result;
 
     /// Writes the `from` part of the sql query without its left part an sql string.
     /// For example for `T: Table` this will write an empty string (`""`),
     ///  and for `InnerJoin<T1: Table, T2: Table>` this will write `"INNER JOIN T2 ON .."`.
-    fn write_sql_from_string_without_left(f: &mut std::fmt::Formatter) -> std::fmt::Result;
+    fn write_sql_from_string_without_left(f: &mut String) -> std::fmt::Result;
 
     /// Creates a select statement which finds records in this source.
     fn find(self) -> SelectStatement<Self> {
@@ -95,11 +100,11 @@ impl<T: TableMarker> SelectFrom for T {
 
     type LeftMostTable = T::Table;
 
-    fn write_sql_from_string(f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_from_string(f: &mut String) -> std::fmt::Result {
         write!(f, "\"{}\"", T::Table::TABLE_NAME)
     }
 
-    fn write_sql_from_string_without_left(_f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_from_string_without_left(_f: &mut String) -> std::fmt::Result {
         Ok(())
     }
 }
@@ -119,12 +124,12 @@ where
 
     type LeftMostTable = A::LeftMostTable;
 
-    fn write_sql_from_string(f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_from_string(f: &mut String) -> std::fmt::Result {
         A::write_sql_from_string(f)?;
         Self::write_sql_from_string_without_left(f)
     }
 
-    fn write_sql_from_string_without_left(f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn write_sql_from_string_without_left(f: &mut String) -> std::fmt::Result {
         write!(
             f,
             " INNER JOIN \"{}\" ON \"{}\".\"{}\" = \"{}\".\"id\"",
