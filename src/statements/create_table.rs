@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use crate::{
     bound_parameters::ParameterBinder,
-    fields_list::TypedConsListNil,
+    util::TypedConsListNil,
     statements::SqlStatement,
     table::{Table, TableField},
 };

@@ -5,6 +5,11 @@ use proc_macro2::Ident;
 use quote::{quote, quote_spanned};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Type};
 
+#[proc_macro]
+pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream{
+    generate_field_name_cons_list_type(&item.to_string()).into()
+}
+
 #[proc_macro_derive(Table, attributes(table))]
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input_tokens as DeriveInput);
@@ -174,7 +179,7 @@ impl TableInputField {
 
 fn generate_field_name_cons_list_type(field_name: &str) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each character.
-    let mut cur = quote! { ::gorm::fields_list::TypedConsListNil };
+    let mut cur = quote! { ::gorm::TypedConsListNil };
 
     for chr in field_name.chars().rev() {
         cur = quote! {
@@ -189,7 +194,7 @@ fn generate_fields_cons_list_type(
     fields: &darling::ast::Fields<TableInputField>,
 ) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each field.
-    let mut cur = quote! { ::gorm::fields_list::TypedConsListNil };
+    let mut cur = quote! { ::gorm::TypedConsListNil };
 
     for field in fields.iter().rev() {
         // safe to unwrap here because only structs with named fields are allowed.
@@ -253,11 +258,3 @@ fn generate_foreign_key_impl(
         }
     }
 }
-
-/*
- *
-/// Indicates that some table has a foreign key to some other table
-pub trait HasForeignKey<T: Table>: Table {
-    type ForeignKeyColumn: Column;
-}
-*/

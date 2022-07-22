@@ -1,6 +1,6 @@
 use tokio_postgres::Row;
 
-use crate::{fields_list::{FieldsConsListItem, TypedConsListNil}, error::*};
+use crate::{fields_list::FieldsConsListItem, error::*, TypedConsListNil};
 
 /// A type that can be built from an sql query result.
 pub trait FromQueryResult: Sized{

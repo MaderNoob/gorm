@@ -14,4 +14,6 @@ pub use gorm_macros::Table;
 pub use sql::table::Table;
 pub use sql::*;
 pub use statements::*;
+pub use util::*;
+
 pub use tokio_postgres;

@@ -1,31 +1,40 @@
-use gorm::InnerJoinTrait;
+use std::marker::PhantomData;
+
 use gorm::expr::OrderableSqlExpression;
 use gorm::expr::SqlExpression;
-use gorm::connection::DatabaseConnection;
 use gorm::table::TableMarker;
 use gorm::ExecuteSqlStatment;
 use gorm::SelectFrom;
 use gorm::Table;
+use gorm::{
+    connection::DatabaseConnection, select_values, selectable_tables::CombinedSelectableTables,
+    InnerJoined,
+};
+use gorm::{
+    selectable_tables::SelectableTables, selected_values::SelectedValues, InnerJoinTrait,
+    TypedConsListNil,
+};
 
 #[tokio::main]
 async fn main() {
-    let client = DatabaseConnection::connect(
-        "postgres://postgres:postgres@localhost/gorm_test",
-    )
-    .await
-    .unwrap();
+    let client = DatabaseConnection::connect("postgres://postgres:postgres@localhost/gorm_test")
+        .await
+        .unwrap();
+
     school::table
         .create()
         .if_not_exists()
         .execute(&client)
         .await
         .unwrap();
+
     person::table
         .create()
         .if_not_exists()
         .execute(&client)
         .await
         .unwrap();
+
     let p = person::table
         .inner_join(school::table)
         .find()
@@ -34,6 +43,12 @@ async fn main() {
         .await
         .unwrap();
     println!("{:?}", p);
+
+    // let x: ::gorm::selected_values::SelectedValuesConsListCons<
+    //     CombinedSelectableTables<Person, School>,
+    //     _,
+    //     _,
+    // > = select_values!((person::name) as person_name, (school::id) as school_id);
 }
 
 #[derive(Debug, Table)]

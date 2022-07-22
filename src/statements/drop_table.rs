@@ -2,7 +2,7 @@ use std::fmt::Write;
 use std::marker::PhantomData;
 
 use crate::{
-    bound_parameters::ParameterBinder, fields_list::TypedConsListNil, statements::SqlStatement,
+    bound_parameters::ParameterBinder, util::TypedConsListNil, statements::SqlStatement,
     table::Table,
 };
 
