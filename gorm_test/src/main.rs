@@ -1,3 +1,4 @@
+use gorm::expr::SqlExpression;
 use gorm::connection::DatabaseConnection;
 use gorm::table::TableMarker;
 use gorm::ExecuteSqlStatment;
@@ -25,7 +26,8 @@ async fn main() {
         .unwrap();
     let p = person::table
         .find()
-        .load_optional::<Person>(&client)
+        .filter(person::name.eq("avi"))
+        .load_all::<Person>(&client)
         .await
         .unwrap();
     println!("{:?}", p);

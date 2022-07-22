@@ -5,11 +5,11 @@ use crate::{
     condition::SqlConditionEq,
     selectable_tables::{SelectableTables, SelectableTablesContains},
     table::{Column, Table},
-    types::{IntoSqlType, SqlType},
+    types::{IntoSqlType, SqlText, SqlType},
 };
 
 /// An sql expression
-pub trait SqlExpression<S: SelectableTables>: Sized {
+pub trait SqlExpression<S: SelectableTables> : Sized {
     type SqlType: SqlType;
     type RustType;
 
@@ -43,7 +43,7 @@ where
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
+        _parameter_binder: &mut ParameterBinder<'a>,
     ) -> std::fmt::Result
     where
         's: 'a,
@@ -85,3 +85,19 @@ macro_rules! impl_primitive_expression{
 }
 
 impl_primitive_expression! {bool, i16, i32, i64, f32, f64}
+
+impl<'b, S: SelectableTables> SqlExpression<S> for &'b str {
+    type SqlType = SqlText;
+    type RustType = &'b str;
+
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "{}", parameter_binder.bind_parameter(self))
+    }
+}

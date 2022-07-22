@@ -1,6 +1,5 @@
 use convert_case::{Case, Casing};
 use darling::{FromDeriveInput, FromField};
-use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::{quote, quote_spanned};

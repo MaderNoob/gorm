@@ -1,10 +1,8 @@
-use std::future::Future;
-
 use crate::{
-    bound_parameters::ParameterBinder, error::*, from_query_result::FromQueryResult, ExecuteResult,
-    SqlStatement,
+    error::*, from_query_result::FromQueryResult, execution::ExecuteResult, statements::SqlStatement
 };
 use async_trait::async_trait;
+use futures::{pin_mut, TryStreamExt};
 use tokio_postgres::{Client, NoTls};
 
 use super::SqlStatementExecutor;
@@ -33,11 +31,7 @@ impl DatabaseConnection {
 #[async_trait]
 impl SqlStatementExecutor for DatabaseConnection {
     async fn execute(&self, statement: impl crate::SqlStatement + Send) -> Result<ExecuteResult> {
-        let mut parameter_binder = ParameterBinder::new();
-        let mut query_string = String::new();
-        statement
-            .write_sql_string(&mut query_string, &mut parameter_binder)
-            .unwrap();
+        let (query_string, parameter_binder) = statement.build();
         let rows_modified = self
             .client
             .execute(&query_string, parameter_binder.parameters())
@@ -50,36 +44,56 @@ impl SqlStatementExecutor for DatabaseConnection {
         &self,
         statement: S,
     ) -> Result<O> {
-        let mut parameter_binder = ParameterBinder::new();
-        let mut query_string = String::new();
-        statement
-            .write_sql_string(&mut query_string, &mut parameter_binder)
-            .unwrap();
-        let row = self
+        let (query_string, parameter_binder) = statement.build();
+        let row_stream = self
             .client
-            .query_one(&query_string, parameter_binder.parameters())
+            .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
-        Ok(O::from_row(row)?)
+        pin_mut!(row_stream);
+
+        let maybe_row = row_stream.try_next().await?;
+        match maybe_row {
+            Some(row) => Ok(O::from_row(row)?),
+            None => Err(Error::NoRecords),
+        }
     }
 
     async fn load_optional<O: FromQueryResult, S: SqlStatement + Send>(
         &self,
         statement: S,
     ) -> Result<Option<O>> {
-        let mut parameter_binder = ParameterBinder::new();
-        let mut query_string = String::new();
-        statement
-            .write_sql_string(&mut query_string, &mut parameter_binder)
-            .unwrap();
-        let maybe_row = self
+        let (query_string, parameter_binder) = statement.build();
+        let row_stream = self
             .client
-            .query_opt(&query_string, parameter_binder.parameters())
+            .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
+        pin_mut!(row_stream);
+
+        let maybe_row = row_stream.try_next().await?;
         match maybe_row {
             Some(row) => Ok(Some(O::from_row(row)?)),
             None => Ok(None),
         }
+    }
+
+    async fn load_all<O: FromQueryResult + Send, S: SqlStatement + Send>(
+        &self,
+        statement: S,
+    ) -> Result<Vec<O>> {
+        let (query_string, parameter_binder) = statement.build();
+        let row_stream = self
+            .client
+            .query_raw(&query_string, parameter_binder.parameters().iter().copied())
+            .await?;
+
+        pin_mut!(row_stream);
+
+        let mut records = Vec::new();
+        while let Some(row) = row_stream.try_next().await? {
+            records.push(O::from_row(row)?)
+        }
+        Ok(records)
     }
 }

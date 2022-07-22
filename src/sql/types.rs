@@ -55,7 +55,7 @@ define_sql_types! {
     SqlI64, "bigint" => i64,
     SqlF32, "real" => f32,
     SqlF64, "double precision" => f64,
-    Text, "text" => String,
+    SqlText, "text" => String,
     [serial] Serial16, "smallserial" => i16 ,
     [serial] Serial32, "serial" => i32,
     [serial] Serial64, "bigserial" => i64,

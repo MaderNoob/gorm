@@ -47,7 +47,7 @@ impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S>> SqlCondi
     {
         self.lhs.write_sql_string(f, parameter_binder)?;
         write!(f, "=")?;
-        self.lhs.write_sql_string(f, parameter_binder)?;
+        self.rhs.write_sql_string(f, parameter_binder)?;
         Ok(())
     }
 }

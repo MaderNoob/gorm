@@ -1,5 +1,3 @@
-use std::{fmt::Display, marker::PhantomData};
-
 use tokio_postgres::types::ToSql;
 
 /// A parameters binder which formats bound parameters as $1 .. $N.

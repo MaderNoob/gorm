@@ -1,20 +1,15 @@
-mod condition;
 mod create_table;
 mod drop_table;
 mod select;
-mod select_from;
 
 use crate::{
-    bound_parameters::ParameterBinder, error::*, fields_list::TypedConsListNil,
-    from_query_result::FromQueryResult, util::TypesNotEqual, ExecuteResult,
+    bound_parameters::ParameterBinder, error::*, from_query_result::FromQueryResult, ExecuteResult,
 };
-use std::fmt::Display;
 
 use async_trait::async_trait;
 pub use create_table::*;
 pub use drop_table::*;
 pub use select::*;
-pub use select_from::*;
 
 use crate::{execution::SqlStatementExecutor, fields_list::FieldsConsListItem};
 
@@ -31,6 +26,14 @@ pub trait SqlStatement: Sized + 'static {
     ) -> std::fmt::Result
     where
         's: 'a;
+
+    fn build(&self) -> (String, ParameterBinder) {
+        let mut parameter_binder = ParameterBinder::new();
+        let mut query_string = String::new();
+        self.write_sql_string(&mut query_string, &mut parameter_binder)
+            .unwrap();
+        (query_string, parameter_binder)
+    }
 }
 
 #[async_trait]
@@ -43,18 +46,25 @@ pub trait ExecuteSqlStatment: SqlStatement {
         on.execute(self).await
     }
 
-    async fn load_one<O: FromQueryResult>(
+    async fn load_one<O: FromQueryResult + Send>(
         self,
         on: &(impl SqlStatementExecutor + Send + Sync),
     ) -> Result<O> {
         on.load_one(self).await
     }
 
-    async fn load_optional<O: FromQueryResult>(
+    async fn load_optional<O: FromQueryResult + Send>(
         self,
         on: &(impl SqlStatementExecutor + Send + Sync),
     ) -> Result<Option<O>> {
         on.load_optional(self).await
+    }
+
+    async fn load_all<O: FromQueryResult + Send>(
+        self,
+        on: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<Vec<O>> {
+        on.load_all(self).await
     }
 }
 
