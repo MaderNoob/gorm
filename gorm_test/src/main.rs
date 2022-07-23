@@ -42,13 +42,10 @@ async fn main() {
         .load_all::<Person>(&client)
         .await
         .unwrap();
+
     println!("{:?}", p);
 
-    // let x: ::gorm::selected_values::SelectedValuesConsListCons<
-    //     CombinedSelectableTables<Person, School>,
-    //     _,
-    //     _,
-    // > = select_values!((person::name) as person_name, (school::id) as school_id);
+    let x = select_values!((person::name) as person_name, (school::id) as school_id);
 }
 
 #[derive(Debug, Table)]
