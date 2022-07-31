@@ -3,9 +3,9 @@ use std::marker::PhantomData;
 
 use crate::{
     bound_parameters::ParameterBinder,
-    util::TypedConsListNil,
     statements::SqlStatement,
     table::{Table, TableField},
+    util::TypedConsListNil,
 };
 
 /// An sql create table statement

@@ -10,10 +10,11 @@ mod util;
 
 pub use error::*;
 pub use execution::*;
-pub use gorm_macros::Table;
 pub use sql::table::Table;
 pub use sql::*;
 pub use statements::*;
 pub use util::*;
 
+pub use gorm_macros::{Table, select_values};
+pub use paste;
 pub use tokio_postgres;

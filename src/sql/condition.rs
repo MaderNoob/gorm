@@ -57,9 +57,9 @@ macro_rules! define_operator_condition{
     }
 }
 
-define_operator_condition!{SqlConditionEq, =}
-define_operator_condition!{SqlConditionNotEq, !=}
-define_operator_condition!{SqlConditionLowerThan, <}
-define_operator_condition!{SqlConditionLowerEquals, <=}
-define_operator_condition!{SqlConditionGreaterThan, >}
-define_operator_condition!{SqlConditionGreaterEquals, >=}
+define_operator_condition! {SqlConditionEq, =}
+define_operator_condition! {SqlConditionNotEq, !=}
+define_operator_condition! {SqlConditionLowerThan, <}
+define_operator_condition! {SqlConditionLowerEquals, <=}
+define_operator_condition! {SqlConditionGreaterThan, >}
+define_operator_condition! {SqlConditionGreaterEquals, >=}

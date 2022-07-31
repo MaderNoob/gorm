@@ -4,6 +4,6 @@ pub mod expr;
 pub mod fields_list;
 pub mod from_query_result;
 pub mod selectable_tables;
+pub mod selected_values;
 pub mod table;
 pub mod types;
-pub mod selected_values;

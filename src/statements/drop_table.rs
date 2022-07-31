@@ -2,8 +2,8 @@ use std::fmt::Write;
 use std::marker::PhantomData;
 
 use crate::{
-    bound_parameters::ParameterBinder, util::TypedConsListNil, statements::SqlStatement,
-    table::Table,
+    bound_parameters::ParameterBinder, statements::SqlStatement, table::Table,
+    util::TypedConsListNil,
 };
 
 /// An sql drop table statement

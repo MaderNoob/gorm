@@ -1,5 +1,6 @@
 use crate::{
-    error::*, from_query_result::FromQueryResult, execution::ExecuteResult, statements::SqlStatement
+    error::*, execution::ExecuteResult, from_query_result::FromQueryResult,
+    statements::SqlStatement,
 };
 use async_trait::async_trait;
 use futures::{pin_mut, TryStreamExt};

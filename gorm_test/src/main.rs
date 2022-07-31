@@ -45,7 +45,7 @@ async fn main() {
 
     println!("{:?}", p);
 
-    let x = select_values!((person::name) as person_name, (school::id) as school_id);
+    let s = select_values!(5 as david, person::name);
 }
 
 #[derive(Debug, Table)]

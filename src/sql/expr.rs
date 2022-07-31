@@ -4,7 +4,7 @@ use crate::{
     bound_parameters::ParameterBinder,
     condition::{
         SqlConditionEq, SqlConditionGreaterEquals, SqlConditionGreaterThan,
-        SqlConditionLowerEquals, SqlConditionLowerThan, SqlConditionNotEq, 
+        SqlConditionLowerEquals, SqlConditionLowerThan, SqlConditionNotEq,
     },
     selectable_tables::{SelectableTables, SelectableTablesContains},
     table::{Column, Table},
@@ -14,7 +14,7 @@ use crate::{
 /// An sql expression
 pub trait SqlExpression<S: SelectableTables>: Sized {
     type SqlType: SqlType;
-    type RustType;
+    type RustType: IntoSqlType;
 
     /// Writes the sql expression as an sql string which can be evaluated by the database.
     fn write_sql_string<'s, 'a>(

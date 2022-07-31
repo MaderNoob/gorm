@@ -20,14 +20,11 @@ pub trait SelectedValues {
 }
 
 pub trait SelectedValuesConsListItem<S: SelectableTables> {
-    /// Whether this value is a nil.
-    const IS_NIL: bool;
-
     /// The next item.
     type Next: SelectedValuesConsListItem<S>;
 
     /// The sql expression of this current item.
-    /// Only relevant if `IS_NIL` is false.
+    /// Only relevant if the item is not a nil.
     type SqlExpression: SqlExpression<S>;
 
     /// Returns a reference to the current expression.
@@ -50,8 +47,6 @@ pub struct SelectedValuesConsListCons<
 impl<S: SelectableTables, Cur: SqlExpression<S>, Next: SelectedValuesConsListItem<S>>
     SelectedValuesConsListItem<S> for SelectedValuesConsListCons<S, Cur, Next>
 {
-    const IS_NIL: bool = false;
-
     type Next = Next;
 
     type SqlExpression = Cur;
@@ -89,26 +84,6 @@ macro_rules! create_selected_values_cons_list {
     }
 }
 
-// pub struct FieldsConsListCons<
-//     FieldName: FieldNameCharsConsListItem,
-//     FieldType,
-//     Next: FieldsConsListItem,
-// >(
-//     PhantomData<FieldName>,
-//     PhantomData<FieldType>,
-//     PhantomData<Next>,
-// );
-
-#[macro_export]
-macro_rules! create_selected_values_fields_cons_list {
-    {$name:ident : $type: ty} => {
-        ::gorm::fields_list::FieldsConsListCons<::gorm::create_field_name_cons_list!{$name}, $type, ::gorm::TypedConsListNil>
-    };
-    {$name:ident : $type: ty, $($rest_name: ident : $rest_type: ty),+} => {
-        ::gorm::fields_list::FieldsConsListCons<::gorm::create_field_name_cons_list!{$name}, $type, create_selected_values_fields_cons_list!{$($rest_name : $rest_type),+}>
-    }
-}
-
 #[macro_export]
 macro_rules! format_selected_sql_expressoins {
     {$cur_item:expr, $f: expr, $parameter_binder: expr, $head:expr} => {
@@ -125,48 +100,83 @@ macro_rules! format_selected_sql_expressoins {
     };
 }
 
+// pub struct FieldsConsListCons<
+//     FieldName: FieldNameCharsConsListItem,
+//     FieldType,
+//     Next: FieldsConsListItem,
+// >(
+//     PhantomData<FieldName>,
+//     PhantomData<FieldType>,
+//     PhantomData<Next>,
+// );
+
+//  #[macro_export]
+//  macro_rules! create_selected_values_fields_cons_list {
+//      {$name:ident : $type: path} => {
+//          ::gorm::fields_list::FieldsConsListCons<::gorm::create_field_name_cons_list!{$name}, $type, ::gorm::TypedConsListNil>
+//      };
+//      {$name:ident : $type: path, $($rest_name: ident : $rest_type: path),+} => {
+//          ::gorm::fields_list::FieldsConsListCons<::gorm::create_field_name_cons_list!{$name}, $type, create_selected_values_fields_cons_list!{$($rest_name : $rest_type),+}>
+//      }
+//  }
+
 #[macro_export]
-macro_rules! select_values {
-    ($(($value: expr) as $name:ident),+) => {
-        {
-        struct CustomSelectedValues<
-            S: ::gorm::selectable_tables::SelectableTables, 
-            ConsList: ::gorm::selected_values::SelectedValuesConsListItem<S>
-        > {
-            cons_list: ConsList,
-            phantom: PhantomData<S>,
+macro_rules! create_custom_selected_values_generic_expr_types {
+     {$($value: expr),+} => {
+        struct X<
+            ::gorm::create_custom_selected_values_generic_expr_types!{E; $($value),+}
+        >
+     };
+     {$cur_name:ident; $value:expr $(,$rest: expr)+} => {
+        ::gorm::paste::paste!{
+            $cur_name: SqlExpression<S>, ::gorm::create_custom_selected_values_generic_expr_types!{[<$cur_name E>], $($rest),+}
         }
+     };
+ }
 
-        impl<
-            S: ::gorm::selectable_tables::SelectableTables, 
-            ConsList: ::gorm::selected_values::SelectedValuesConsListItem<S>
-        > ::gorm::selected_values::SelectedValues for CustomSelectedValues<S, ConsList> {
-                type Fields = ::gorm::create_selected_values_fields_cons_list!{$($value),+};
-
-                /// Writes the selected values as an sql string which can be selected by the database.
-                fn write_sql_string<'s, 'a>(
-                    &'s self,
-                    f: &mut ::std::string::String,
-                    parameter_binder: &mut ::gorm::bound_parameters::ParameterBinder<'a>,
-                ) -> ::std::fmt::Result
-                where
-                    's: 'a{
-                        use ::gorm::expr::SqlExpression;
-                        use ::std::fmt::Write;
-                        use ::gorm::selected_values::SelectedValuesConsListItem;
-
-                        let cur_item = &self.cons_list;
-                        ::gorm::format_selected_sql_expressoins!{cur_item, f, parameter_binder, $($value),+}
-
-                        Ok(())
-                    }
-            }
-
-            let cons_list = ::gorm::create_selected_values_cons_list!($(($value) as $name),+);
-            CustomSelectedValues{
-                cons_list,
-                phantom: ::std::marker::PhantomData,
-            }
-        }
-    };
-}
+// #[macro_export]
+// macro_rules! select_values {
+//     ($(($value: expr) as $name:ident),+) => {
+//         {
+//             ::gorm::create_custom_selected_values_generic_expr_types!{ $($value),+ }
+//         struct CustomSelectedValues<
+//             S: ::gorm::selectable_tables::SelectableTables,
+//             ConsList: ::gorm::selected_values::SelectedValuesConsListItem<S>
+//         > {
+//             cons_list: ConsList,
+//             phantom: PhantomData<S>,
+//         }
+// 
+//         impl<
+//             S: ::gorm::selectable_tables::SelectableTables,
+//             ConsList: ::gorm::selected_values::SelectedValuesConsListItem<S>
+//         > ::gorm::selected_values::SelectedValues for CustomSelectedValues<S, ConsList> {
+//                 type Fields = ::gorm::create_selected_values_fields_cons_list!{$($name : $value),+};
+// 
+//                 /// Writes the selected values as an sql string which can be selected by the database.
+//                 fn write_sql_string<'s, 'a>(
+//                     &'s self,
+//                     f: &mut ::std::string::String,
+//                     parameter_binder: &mut ::gorm::bound_parameters::ParameterBinder<'a>,
+//                 ) -> ::std::fmt::Result
+//                 where
+//                     's: 'a{
+//                         use ::gorm::expr::SqlExpression;
+//                         use ::std::fmt::Write;
+//                         use ::gorm::selected_values::SelectedValuesConsListItem;
+// 
+//                         let cur_item = &self.cons_list;
+//                         ::gorm::format_selected_sql_expressoins!{cur_item, f, parameter_binder, $($value),+}
+// 
+//                         Ok(())
+//                     }
+//             }
+// 
+//             let cons_list = ::gorm::create_selected_values_cons_list!($(($value) as $name),+);
+//             CustomSelectedValues{
+//                 cons_list,
+//                 phantom: ::std::marker::PhantomData,
+//             }
+//         }
+//     };
+// }

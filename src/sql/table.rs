@@ -1,7 +1,7 @@
 use crate::{
     fields_list::FieldsConsListItem,
     statements::{CreateTableStatement, DropTableStatement},
-    types::SqlType,
+    types::{SqlType, IntoSqlType},
 };
 
 /// A table in the database.
@@ -25,7 +25,7 @@ pub trait Column {
     const COLUMN_NAME: &'static str;
     type Table: Table;
     type SqlType: SqlType;
-    type RustType;
+    type RustType: IntoSqlType;
 }
 
 /// A trait for representing a table marker, which is an empty type which is used to reference a

@@ -13,8 +13,10 @@ impl<'a> ParameterBinder<'a> {
         }
     }
 
-    pub fn bind_parameter<T: ToSql + Sync>(&mut self, parameter: &'a T) -> DisplayableBoundParameterDollarN
-    {
+    pub fn bind_parameter<T: ToSql + Sync>(
+        &mut self,
+        parameter: &'a T,
+    ) -> DisplayableBoundParameterDollarN {
         self.parameters.push(parameter);
 
         let result = DisplayableBoundParameterDollarN { n: self.cur_n };
@@ -24,7 +26,7 @@ impl<'a> ParameterBinder<'a> {
         result
     }
 
-    pub fn parameters(&self)->&[&'a (dyn ToSql + Sync)]{
+    pub fn parameters(&self) -> &[&'a (dyn ToSql + Sync)] {
         &self.parameters
     }
 }
@@ -37,4 +39,3 @@ impl std::fmt::Display for DisplayableBoundParameterDollarN {
         write!(f, "${}", self.n)
     }
 }
-

@@ -91,13 +91,18 @@ macro_rules! define_sql_type {
 
 pub trait OrderableSqlType {}
 
-define_sql_type!{ SqlBool, "boolean" => bool }
-define_sql_type!{ orderable SqlI16, "smallint" => i16 }
-define_sql_type!{ orderable SqlI32, "integer" => i32 }
-define_sql_type!{ orderable SqlI64, "bigint" => i64 }
-define_sql_type!{ orderable SqlF32, "real" => f32 }
-define_sql_type!{ orderable SqlF64, "double precision" => f64 }
-define_sql_type!{ SqlText, "text" => String }
-define_sql_type!{ serial Serial16, "smallserial" => i16  }
-define_sql_type!{ serial Serial32, "serial" => i32 }
-define_sql_type!{ serial Serial64, "bigserial" => i64 }
+define_sql_type! { SqlBool, "boolean" => bool }
+define_sql_type! { orderable SqlI16, "smallint" => i16 }
+define_sql_type! { orderable SqlI32, "integer" => i32 }
+define_sql_type! { orderable SqlI64, "bigint" => i64 }
+define_sql_type! { orderable SqlF32, "real" => f32 }
+define_sql_type! { orderable SqlF64, "double precision" => f64 }
+define_sql_type! { SqlText, "text" => String }
+define_sql_type! { serial Serial16, "smallserial" => i16  }
+define_sql_type! { serial Serial32, "serial" => i32 }
+define_sql_type! { serial Serial64, "bigserial" => i64 }
+
+impl<'a> IntoSqlType for &'a str{
+    type SqlType = SqlText;
+}
+

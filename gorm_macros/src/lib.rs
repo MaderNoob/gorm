@@ -2,12 +2,210 @@ use convert_case::{Case, Casing};
 use darling::{FromDeriveInput, FromField};
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Type};
+use quote::{quote, quote_spanned, ToTokens};
+use syn::{
+    parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::As,
+    DeriveInput, Expr, Token, Type, ExprParen,
+};
 
 #[proc_macro]
-pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream{
+pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
     generate_field_name_cons_list_type(&item.to_string()).into()
+}
+
+struct RawSelectedValue {
+    selected_expr: Expr,
+    select_as: Option<Ident>,
+}
+impl Parse for RawSelectedValue {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let selected_expr: Expr = input.parse()?;
+
+        // if the cast is used without parentheses, extract the `as <name>` from the expression.
+        if let Expr::Cast(expr_cast) = selected_expr {
+            let as_tokenstream: TokenStream = expr_cast.ty.into_token_stream().into();
+            let as_ident: Ident = syn::parse(as_tokenstream)?;
+            return Ok(Self {
+                selected_expr: *expr_cast.expr,
+                select_as: Some(as_ident),
+            });
+        }
+
+        let lookahead = input.lookahead1();
+        let select_as = if lookahead.peek(Token![as]) {
+            input.parse::<As>()?;
+            Some(input.parse::<Ident>()?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            selected_expr,
+            select_as,
+        })
+    }
+}
+
+struct RawSelectValuesInput {
+    values: Punctuated<RawSelectedValue, Token![,]>,
+}
+
+impl Parse for RawSelectValuesInput {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let values = Punctuated::<RawSelectedValue, Token![,]>::parse_terminated(input)?;
+        Ok(Self { values })
+    }
+}
+
+struct SelectValuesInput {
+    values: Vec<SelectedValue>,
+}
+
+struct SelectedValue {
+    selected_expr: Expr,
+    select_as: Ident,
+
+    /// should an explicit `as <name>` be added to this value when formatting it to sql.
+    /// This will be true for complicated expressions, but false for example for `person::name`.
+    should_use_explicit_as_in_sql: bool,
+}
+
+#[proc_macro]
+pub fn select_values(input_tokens: TokenStream) -> TokenStream {
+    let raw_select_values_input = parse_macro_input!(input_tokens as RawSelectValuesInput);
+    let mut values = Vec::with_capacity(raw_select_values_input.values.len());
+    for raw_value in raw_select_values_input.values {
+        let value = match raw_value.select_as {
+            Some(select_as) => SelectedValue {
+                selected_expr: raw_value.selected_expr,
+                select_as,
+                should_use_explicit_as_in_sql: true,
+            },
+            None => {
+                // if the expression doesn't have an `as` clause, it must be a path as in
+                // `person::name` so that we can get its name from the last path segment.
+                match &raw_value.selected_expr {
+                    Expr::Path(expr_path) => {
+                        let last_segment = expr_path.path.segments.last().unwrap();
+                        let select_as_ident = last_segment.ident.clone();
+                        SelectedValue {
+                            selected_expr: raw_value.selected_expr,
+                            select_as: select_as_ident,
+                            should_use_explicit_as_in_sql: false,
+                        }
+                    }
+                    _ => {
+                        return quote_spanned! {
+                            raw_value.selected_expr.span() => compile_error!("selecting a value without explicitly specifying its name can only be used with paths, like in `person::name`. please add `as <name>` to explicitly specify the name of this selected expression"),
+                        }.into()
+                    }
+                }
+            }
+        };
+        values.push(value);
+    }
+
+    let select_values_input = SelectValuesInput{
+        values
+    };
+
+    // the definition of the generics, for example: `E0,E1,E2`
+    let struct_expr_generics_definition = (0..select_values_input.values.len()).map(|i|{
+        let generic_name = Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
+        quote!{
+            #generic_name: ::gorm::expr::SqlExpression<S>
+        }
+    });
+
+    let struct_generics_definition = quote!{
+        S: ::gorm::selectable_tables::SelectableTables,
+        #(#struct_expr_generics_definition),*
+    };
+    let struct_generics_definition_clone = struct_generics_definition.clone();
+
+    let struct_tuple_fields_definition = (0..select_values_input.values.len()).map(|i|{
+        Ident::new(&format!("E{}", i), proc_macro2::Span::call_site())
+    });
+
+    let use_expr_generics_in_impl = (0..select_values_input.values.len()).map(|i|{
+        Ident::new(&format!("E{}", i), proc_macro2::Span::call_site())
+    });
+
+    let fields_cons_list = create_selected_values_fields_cons_list(&select_values_input);
+
+    let write_selected_expressions_sql_string = select_values_input.values.iter().enumerate().map(|(i,selected_value)|{
+        let as_and_comma_string = if selected_value.should_use_explicit_as_in_sql{
+            let select_as = selected_value.select_as.to_string();
+            format!(" as {},", select_as)
+        }else{
+            ",".to_string()
+        };
+        quote!{
+            self.#i.write_sql_string(f, parameter_binder)?;
+            write!(f, #as_and_comma_string)?;
+        }
+    });
+
+    let create_instance_tuple_values = select_values_input.values.iter().map(|selected_value|{
+        &selected_value.selected_expr
+    });
+
+    quote! {
+        {
+            struct CustomSelectedValues<#struct_generics_definition>(
+                #(#struct_tuple_fields_definition),* ,
+                ::std::marker::PhantomData<S>,
+            );
+            
+            #[automatically_derived]
+            impl<#struct_generics_definition_clone> 
+                ::gorm::selected_values::SelectedValues for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
+            {
+                type Fields = #fields_cons_list;
+
+                fn write_sql_string<'s, 'a>(
+                    &'s self,
+                    f: &mut ::std::string::String,
+                    parameter_binder: &mut ::gorm::bound_parameters::ParameterBinder<'a>,
+                ) -> ::std::fmt::Result
+                where 's: 'a
+                {
+                    use ::std::fmt::Write;
+                    #(
+                        #write_selected_expressions_sql_string
+                     )*
+                    Ok(())
+                }
+            }
+            CustomSelectedValues(#(#create_instance_tuple_values),* , ::std::marker::PhantomData)
+        }
+    }.into()
+}
+
+fn create_selected_values_fields_cons_list(select_values_input: &SelectValuesInput)->proc_macro2::TokenStream{
+    // start with the inner most type and wrap it each time with each field.
+    let mut cur = quote! { ::gorm::TypedConsListNil };
+
+    for (i,selected_value) in select_values_input.values.iter().enumerate().rev(){
+        // safe to unwrap here because only structs with named fields are allowed.
+        let field_name = selected_value.select_as.to_string();
+        let field_name_type = generate_field_name_cons_list_type(&field_name);
+
+        let selected_expr_generic_ident = Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
+        let field_type = quote!{
+            #selected_expr_generic_ident::RustType
+        };
+
+        cur = quote! {
+            ::gorm::fields_list::FieldsConsListCons<
+                #field_name_type,
+                #field_type,
+                #cur
+            >
+        };
+    }
+
+    cur
 }
 
 #[proc_macro_derive(Table, attributes(table))]
@@ -96,7 +294,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         impl ::gorm::from_query_result::FromQueryResult for #table_struct_ident
         {
             type Fields = #fields_type;
-            
+
             fn from_row(row: ::gorm::tokio_postgres::row::Row) -> ::gorm::Result<Self>{
                 Ok(
                     Self{

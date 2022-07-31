@@ -64,12 +64,9 @@ impl<S: SelectFrom + 'static, C: SqlCondition<S::SelectableTables> + 'static> Sq
     where
         's: 'a,
     {
-        write!(
-            f,
-            "SELECT * FROM "
-        )?;
+        write!(f, "SELECT * FROM ")?;
         S::write_sql_from_string(f)?;
-        write!(f," where ")?;
+        write!(f, " where ")?;
         self.condition.write_sql_string(f, parameter_binder)
     }
 }
