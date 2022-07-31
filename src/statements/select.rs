@@ -6,6 +6,7 @@ use crate::{
     bound_parameters::ParameterBinder,
     condition::SqlCondition,
     selectable_tables::{CombineSelectableTables, CombinedSelectableTables, SelectableTables},
+    selected_values::SelectedValues,
     table::{Column, HasForeignKey, TableMarker},
     Table,
 };
@@ -15,6 +16,16 @@ pub struct SelectStatement<S: SelectFrom>(PhantomData<S>);
 impl<S: SelectFrom> SelectStatement<S> {
     pub fn new() -> Self {
         Self(PhantomData)
+    }
+
+    pub fn select<V: SelectedValues<S::SelectableTables>>(
+        self,
+        selected_values: V,
+    ) -> SelectStatementCustomValues<S, V> {
+        SelectStatementCustomValues {
+            values: selected_values,
+            phantom: PhantomData,
+        }
     }
 
     pub fn filter<C: SqlCondition<<S as SelectFrom>::SelectableTables>>(
@@ -27,8 +38,8 @@ impl<S: SelectFrom> SelectStatement<S> {
         }
     }
 }
-impl<T: TableMarker> SqlStatement for SelectStatement<T> {
-    type OutputFields = <T::Table as Table>::Fields;
+impl<S: SelectFrom + 'static> SqlStatement for SelectStatement<S> {
+    type OutputFields = <S::LeftMostTable as Table>::Fields;
 
     fn write_sql_string<'s, 'a>(
         &'s self,
@@ -38,7 +49,36 @@ impl<T: TableMarker> SqlStatement for SelectStatement<T> {
     where
         's: 'a,
     {
-        write!(f, "SELECT * FROM \"{}\"", <T::Table as Table>::TABLE_NAME)
+        write!(f, "SELECT * FROM ")?;
+        S::write_sql_from_string(f)?;
+        Ok(())
+    }
+}
+
+/// An sql statement for finding records in a table which selects custom values
+pub struct SelectStatementCustomValues<S: SelectFrom, V: SelectedValues<S::SelectableTables>> {
+    values: V,
+    phantom: PhantomData<S>,
+}
+
+impl<S: SelectFrom + 'static, V: SelectedValues<S::SelectableTables> + 'static> SqlStatement
+    for SelectStatementCustomValues<S, V>
+{
+    type OutputFields = V::Fields;
+
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "SELECT ")?;
+        self.values.write_sql_string(f, parameter_binder)?;
+        write!(f, " FROM ")?;
+        S::write_sql_from_string(f)?;
+        Ok(())
     }
 }
 

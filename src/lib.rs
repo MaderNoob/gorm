@@ -15,6 +15,6 @@ pub use sql::*;
 pub use statements::*;
 pub use util::*;
 
-pub use gorm_macros::{Table, select_values};
+pub use gorm_macros::{Table, FromQueryResult, select_values};
 pub use paste;
 pub use tokio_postgres;

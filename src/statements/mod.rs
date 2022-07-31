@@ -47,21 +47,21 @@ pub trait ExecuteSqlStatment: SqlStatement {
         on.execute(self).await
     }
 
-    async fn load_one<O: FromQueryResult + Send>(
+    async fn load_one<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
         self,
         on: &(impl SqlStatementExecutor + Send + Sync),
     ) -> Result<O> {
         on.load_one(self).await
     }
 
-    async fn load_optional<O: FromQueryResult + Send>(
+    async fn load_optional<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
         self,
         on: &(impl SqlStatementExecutor + Send + Sync),
     ) -> Result<Option<O>> {
         on.load_optional(self).await
     }
 
-    async fn load_all<O: FromQueryResult + Send>(
+    async fn load_all<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
         self,
         on: &(impl SqlStatementExecutor + Send + Sync),
     ) -> Result<Vec<O>> {

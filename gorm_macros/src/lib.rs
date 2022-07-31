@@ -140,9 +140,22 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
         }else{
             ",".to_string()
         };
+
+        // as long as it's not the last item, write the comma
+        let write_as_and_comma_string = if i+1 < select_values_input.values.len(){
+            quote!{
+                write!(f, #as_and_comma_string)?;
+            }
+        }else{
+            quote!{}
+        };
+
+
+        let field_index = syn::Index::from(i);
+
         quote!{
-            self.#i.write_sql_string(f, parameter_binder)?;
-            write!(f, #as_and_comma_string)?;
+            self.#field_index.write_sql_string(f, parameter_binder)?;
+            #write_as_and_comma_string
         }
     });
 
@@ -159,7 +172,7 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
             
             #[automatically_derived]
             impl<#struct_generics_definition_clone> 
-                ::gorm::selected_values::SelectedValues for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
+                ::gorm::selected_values::SelectedValues<S> for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
             {
                 type Fields = #fields_cons_list;
 
@@ -208,6 +221,54 @@ fn create_selected_values_fields_cons_list(select_values_input: &SelectValuesInp
     cur
 }
 
+#[proc_macro_derive(FromQueryResult)]
+pub fn from_query_result(input_tokens: TokenStream) -> TokenStream {
+    let derive_input = parse_macro_input!(input_tokens as DeriveInput);
+    let input = FromQueryResultInput::from_derive_input(&derive_input).unwrap();
+    let FromQueryResultInput {
+        ident: struct_ident,
+        generics,
+        data,
+    } = input;
+
+    if !generics.params.is_empty() {
+        return quote_spanned! {
+            generics.span() => compile_error!("generics are not supported for parsing query results")
+        }
+        .into();
+    }
+
+    let fields = data.take_struct().unwrap();
+    if !fields.style.is_struct() {
+        return quote_spanned! {
+            derive_input.span() => compile_error!("only named structs are supported for parsing query results")
+        }
+        .into();
+    }
+
+    let field_names = fields.iter().map(|field| &field.ident);
+    let fields_type = generate_fields_cons_list_type(fields.iter().map(|field| (&field.ident, &field.ty)));
+
+    quote!{
+        #[automatically_derived]
+        impl ::gorm::from_query_result::FromQueryResult for #struct_ident
+        {
+            type Fields = #fields_type;
+
+            fn from_row(row: ::gorm::tokio_postgres::row::Row) -> ::gorm::Result<Self>{
+                Ok(
+                    Self{
+                        #(
+                            #field_names: row.try_get(stringify!(#field_names)).map_err(::gorm::Error::FailedToGetColumn)?
+                         ),*
+                    }
+                )
+            }
+        }
+    }.into()
+}
+
+
 #[proc_macro_derive(Table, attributes(table))]
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input_tokens as DeriveInput);
@@ -232,7 +293,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     let fields = data.take_struct().unwrap();
     if !fields.style.is_struct() {
         return quote_spanned! {
-            derive_input.span() => compile_error!("only named struct are supported for tables")
+            derive_input.span() => compile_error!("only named structs are supported for tables")
         }
         .into();
     }
@@ -253,7 +314,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     let table_field_structs = fields
         .iter()
         .map(|field| field.generate_table_field_struct());
-    let fields_type = generate_fields_cons_list_type(&fields);
+    let fields_type = generate_fields_cons_list_type(fields.iter().map(|field| (&field.ident, &field.ty)));
 
     let table_name_ident = Ident::new(&table_name, table_struct_ident.span());
 
@@ -323,6 +384,20 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 }
 
 #[derive(Debug, FromDeriveInput)]
+#[darling(supports(struct_named))]
+struct FromQueryResultInput {
+    ident: Ident,
+    generics: syn::Generics,
+    data: darling::ast::Data<(), TableInputField>,
+}
+
+#[derive(Debug, FromField)]
+struct FromQueryResultInputField {
+    ident: Option<Ident>,
+    ty: Type,
+}
+
+#[derive(Debug, FromDeriveInput)]
 #[darling(attributes(table), supports(struct_named))]
 struct TableInput {
     ident: Ident,
@@ -388,17 +463,17 @@ fn generate_field_name_cons_list_type(field_name: &str) -> proc_macro2::TokenStr
     cur
 }
 
-fn generate_fields_cons_list_type(
-    fields: &darling::ast::Fields<TableInputField>,
+fn generate_fields_cons_list_type<'a>(
+    fields: impl Iterator<Item = (&'a Option<Ident>, &'a Type)> + DoubleEndedIterator,
 ) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each field.
     let mut cur = quote! { ::gorm::TypedConsListNil };
 
-    for field in fields.iter().rev() {
+    for field in fields.rev() {
         // safe to unwrap here because only structs with named fields are allowed.
-        let field_name = field.ident.as_ref().unwrap().to_string();
+        let field_name = field.0.as_ref().unwrap().to_string();
         let field_name_type = generate_field_name_cons_list_type(&field_name);
-        let field_type = &field.ty;
+        let field_type = &field.1;
         cur = quote! {
             ::gorm::fields_list::FieldsConsListCons<
                 #field_name_type,

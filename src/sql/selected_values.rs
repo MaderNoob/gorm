@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// The selected values in an sql query.
-pub trait SelectedValues {
+pub trait SelectedValues<S: SelectableTables> {
     type Fields: FieldsConsListItem;
 
     /// Writes the selected values as an sql string which can be selected by the database.

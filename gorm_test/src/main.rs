@@ -4,6 +4,7 @@ use gorm::expr::OrderableSqlExpression;
 use gorm::expr::SqlExpression;
 use gorm::table::TableMarker;
 use gorm::ExecuteSqlStatment;
+use gorm::FromQueryResult;
 use gorm::SelectFrom;
 use gorm::Table;
 use gorm::{
@@ -45,7 +46,19 @@ async fn main() {
 
     println!("{:?}", p);
 
-    let s = select_values!(5 as david, person::name);
+    #[derive(Debug, FromQueryResult)]
+    struct PersonName {
+        name: String,
+    }
+
+    let p = person::table
+        .find()
+        .select(select_values!(person::name))
+        .load_all::<PersonName>(&client)
+        .await
+        .unwrap();
+
+    println!("{:?}", p);
 }
 
 #[derive(Debug, Table)]
