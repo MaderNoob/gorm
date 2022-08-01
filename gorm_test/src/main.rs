@@ -1,9 +1,12 @@
 use gorm::{
     execution::DatabaseConnection,
     select_values,
-    sql::{AddableSqlExpression, OrderableSqlExpression, SqlExpression, TableMarker},
+    sql::{
+        AddableSqlExpression, AverageableSqlExpression, OrderableSqlExpression, SqlExpression,
+        TableMarker,
+    },
     statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom},
-    FromQueryResult, Table,
+    FromQueryResult, Table, Decimal,
 };
 
 #[tokio::main]
@@ -44,14 +47,14 @@ async fn main() {
     println!("{:?}", p);
 
     #[derive(Debug, FromQueryResult)]
-    struct PeopleAmount {
-        people_amount: i64,
+    struct PeopleAvgAge {
+        avg_age: Decimal,
     }
 
     let p = person::table
         .find()
-        .select(select_values!(person::id.count() as people_amount))
-        .load_all::<PeopleAmount>(&client)
+        .select(select_values!(person::age.average() as avg_age))
+        .load_all::<PeopleAvgAge>(&client)
         .await
         .unwrap();
 
