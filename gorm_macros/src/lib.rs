@@ -7,7 +7,7 @@ use proc_macro2::Ident;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
     parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::As,
-    DeriveInput, Expr, ExprParen, Token, Type,
+    DeriveInput, Expr, Token, Type,
 };
 
 #[proc_macro]
@@ -324,10 +324,9 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     }
 
     // make sure there is a field named id
-    if fields
+    if !fields
         .iter()
-        .find(|field| field.ident.as_ref().unwrap().to_string() == "id")
-        .is_none()
+        .any(|field| field.ident.as_ref().unwrap() == "id")
     {
         return quote_spanned! {
             derive_input.span() => compile_error!("table struct must have a field named \"id\"");
@@ -361,12 +360,12 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         Some(generate_foreign_key_impl(
             &table_struct_ident,
             &table_name_ident,
-            &foreign_key_to_table_name,
+            foreign_key_to_table_name,
             field.ident.as_ref().unwrap(),
         ))
     });
 
-    return quote! {
+    quote! {
         #[automatically_derived]
         impl ::gorm::sql::Table for #table_struct_ident {
             type Fields = #fields_type;
@@ -406,7 +405,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             #table_marker
         }
     }
-    .into();
+    .into()
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -443,7 +442,7 @@ impl TableInputField {
     fn generate_table_field_struct(&self) -> proc_macro2::TokenStream {
         // it is safe to unwrap here since only named fields are allowed.
         let name = self.ident.as_ref().unwrap();
-        let is_primary_key = name.to_string() == "id";
+        let is_primary_key = name == "id";
         let ty = &self.ty;
         let sql_type_name = if is_primary_key {
             quote! {
@@ -457,7 +456,7 @@ impl TableInputField {
         let foreign_key_to_table_name = match &self.foreign_key {
             Some(foreign_key_table_struct_name) => {
                 let foreign_key_table_struct_ident =
-                    Ident::new(&foreign_key_table_struct_name, self.ident.span());
+                    Ident::new(foreign_key_table_struct_name, self.ident.span());
                 quote! {
                     Some(<#foreign_key_table_struct_ident as ::gorm::Table>::TABLE_NAME)
                 }

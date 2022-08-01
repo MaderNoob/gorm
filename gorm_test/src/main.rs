@@ -1,7 +1,7 @@
 use gorm::{
     execution::DatabaseConnection,
     select_values,
-    sql::{OrderableSqlExpression, TableMarker},
+    sql::{AddableSqlExpression, OrderableSqlExpression, SqlExpression, TableMarker},
     statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom},
     FromQueryResult, Table,
 };
@@ -44,14 +44,14 @@ async fn main() {
     println!("{:?}", p);
 
     #[derive(Debug, FromQueryResult)]
-    struct PersonName {
-        name: String,
+    struct PeopleAmount {
+        people_amount: i64,
     }
 
     let p = person::table
         .find()
-        .select(select_values!(person::name))
-        .load_all::<PersonName>(&client)
+        .select(select_values!(person::id.count() as people_amount))
+        .load_all::<PeopleAmount>(&client)
         .await
         .unwrap();
 

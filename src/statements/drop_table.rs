@@ -24,7 +24,7 @@ impl<T: Table> SqlStatement for DropTableStatement<T> {
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
+        _parameter_binder: &mut ParameterBinder<'a>,
     ) -> std::fmt::Result
     where
         's: 'a,
@@ -41,7 +41,7 @@ impl<T: Table> SqlStatement for DropTableIfExistsStatement<T> {
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
+        _parameter_binder: &mut ParameterBinder<'a>,
     ) -> std::fmt::Result
     where
         's: 'a,

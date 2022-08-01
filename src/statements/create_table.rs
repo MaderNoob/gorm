@@ -25,7 +25,7 @@ impl<T: Table> SqlStatement for CreateTableStatement<T> {
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
+        _parameter_binder: &mut ParameterBinder<'a>,
     ) -> std::fmt::Result
     where
         's: 'a,
@@ -47,7 +47,7 @@ impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
+        _parameter_binder: &mut ParameterBinder<'a>,
     ) -> std::fmt::Result
     where
         's: 'a,
@@ -64,9 +64,9 @@ impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
 fn generate_create_table_columns_sql_string(fields: &[TableField]) -> String {
     let mut fields_string = String::new();
     for field_info in fields {
-        fields_string.push_str(&field_info.name);
+        fields_string.push_str(field_info.name);
         fields_string.push(' ');
-        fields_string.push_str(&field_info.sql_type_name);
+        fields_string.push_str(field_info.sql_type_name);
         if field_info.is_primary_key {
             fields_string.push_str(" PRIMARY KEY");
         } else {

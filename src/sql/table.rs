@@ -24,7 +24,7 @@ pub trait Column {
     const COLUMN_NAME: &'static str;
     type Table: Table;
     type SqlType: SqlType;
-    type RustType: IntoSqlType;
+    type RustType: IntoSqlType<SqlType = Self::SqlType>;
 }
 
 /// A trait for representing a table marker, which is an empty type which is

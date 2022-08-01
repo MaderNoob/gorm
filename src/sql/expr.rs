@@ -1,5 +1,6 @@
 use std::fmt::Write;
 
+use super::{SqlAdd, SqlAddition, SqlSubtract, SqlSubtraction, SqlMultiply, SqlMultiplication, SqlDivide, SqlDivision, SqlCount};
 use crate::sql::{
     Column, IntoSqlType, OrderableSqlType, ParameterBinder, SelectableTables,
     SelectableTablesContains, SqlConditionEq, SqlConditionGreaterEquals, SqlConditionGreaterThan,
@@ -9,7 +10,7 @@ use crate::sql::{
 /// An sql expression
 pub trait SqlExpression<S: SelectableTables>: Sized {
     type SqlType: SqlType;
-    type RustType: IntoSqlType;
+    type RustType: IntoSqlType<SqlType = Self::SqlType>;
 
     /// Writes the sql expression as an sql string which can be evaluated by the
     /// database.
@@ -39,6 +40,11 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
         other: O,
     ) -> SqlConditionNotEq<S, Self, O> {
         SqlConditionNotEq::new(self, other)
+    }
+
+    /// Returns an expression which evaluates to the amount of items returned from the query.
+    fn count(self) -> SqlCount<S, Self>{
+        SqlCount::new(self)
     }
 }
 
@@ -74,7 +80,9 @@ pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S> {
     fn lower_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
-    ) -> SqlConditionLowerThan<S, Self, O>;
+    ) -> SqlConditionLowerThan<S, Self, O> {
+        SqlConditionLowerThan::new(self, other)
+    }
 
     /// Returns a condition which will be true if this expression is lower or
     /// equal to the given one.
@@ -82,7 +90,9 @@ pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S> {
     fn lower_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
-    ) -> SqlConditionLowerEquals<S, Self, O>;
+    ) -> SqlConditionLowerEquals<S, Self, O> {
+        SqlConditionLowerEquals::new(self, other)
+    }
 
     /// Returns a condition which will be true if this expression is greater
     /// than the given one.
@@ -90,7 +100,9 @@ pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S> {
     fn greater_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
-    ) -> SqlConditionGreaterThan<S, Self, O>;
+    ) -> SqlConditionGreaterThan<S, Self, O> {
+        SqlConditionGreaterThan::new(self, other)
+    }
 
     /// Returns a condition which will be true if this expression is greater or
     /// equal to the given one.
@@ -98,47 +110,40 @@ pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S> {
     fn greater_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
-    ) -> SqlConditionGreaterEquals<S, Self, O>;
-}
-impl<S: SelectableTables, T: SqlExpression<S>> OrderableSqlExpression<S> for T
-where
-    T::SqlType: OrderableSqlType,
-{
-    fn lower_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
-        self,
-        other: O,
-    ) -> SqlConditionLowerThan<S, Self, O> {
-        SqlConditionLowerThan::new(self, other)
-    }
-
-    fn lower_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
-        self,
-        other: O,
-    ) -> SqlConditionLowerEquals<S, Self, O> {
-        SqlConditionLowerEquals::new(self, other)
-    }
-
-    fn greater_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
-        self,
-        other: O,
-    ) -> SqlConditionGreaterThan<S, Self, O> {
-        SqlConditionGreaterThan::new(self, other)
-    }
-
-    fn greater_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
-        self,
-        other: O,
     ) -> SqlConditionGreaterEquals<S, Self, O> {
         SqlConditionGreaterEquals::new(self, other)
     }
 }
+impl<S: SelectableTables, T: SqlExpression<S>> OrderableSqlExpression<S> for T where
+    T::SqlType: OrderableSqlType
+{
+}
 
-// define_operator_condition!{SqlConditionEq, =}
-// define_operator_condition!{SqlConditionNotEq, !=}
-// define_operator_condition!{SqlConditionLowerThan, <}
-// define_operator_condition!{SqlConditionLowerEquals, <=}
-// define_operator_condition!{SqlConditionGreaterThan, >}
-// define_operator_condition!{SqlConditionGreaterEquals, >=}
+macro_rules! define_expression_operator_trait {
+    {$trait_name: ident, $sql_type_marker: ident, $expr_type: ident, $fn_name: ident} => {
+        pub trait $trait_name<S: SelectableTables, Rhs: SqlExpression<S>>:
+            SqlExpression<S>
+        where
+            Self::SqlType: $sql_type_marker<Rhs::SqlType>,
+        {
+            fn $fn_name(self, other: Rhs) -> $expr_type<S, Self, Rhs> {
+                $expr_type::new(self, other)
+            }
+        }
+
+        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S>> $trait_name<S, Rhs>
+            for Lhs
+        where
+            Lhs::SqlType: $sql_type_marker<Rhs::SqlType>,
+        {
+        }
+    };
+}
+
+define_expression_operator_trait!{AddableSqlExpression, SqlAdd, SqlAddition, add}
+define_expression_operator_trait!{SubtractableSqlExpression, SqlSubtract, SqlSubtraction, subtract}
+define_expression_operator_trait!{MultipliableSqlExpression, SqlMultiply, SqlMultiplication, multiply}
+define_expression_operator_trait!{DivisibleSqlExpression, SqlDivide, SqlDivision, divide}
 
 macro_rules! impl_primitive_expression{
     { $($t: ty),+ }=> {

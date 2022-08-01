@@ -1,6 +1,6 @@
 use std::{fmt::Write, marker::PhantomData};
 
-use crate::sql::{ParameterBinder, SelectableTables, SqlExpression};
+use crate::sql::{ParameterBinder, SelectableTables, SqlBool, SqlExpression};
 
 /// A condition in a where clause.
 pub trait SqlCondition<S: SelectableTables> {
@@ -17,13 +17,13 @@ pub trait SqlCondition<S: SelectableTables> {
 
 macro_rules! define_operator_condition{
     {$type_name: ident, $operator: tt} => {
-        pub struct $type_name<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S>> {
+        pub struct $type_name<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> {
             lhs: Lhs,
             rhs: Rhs,
             phantom: PhantomData<S>,
         }
 
-        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S>>
+        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>>
             $type_name<S, Lhs, Rhs>
         {
             pub fn new(lhs: Lhs, rhs: Rhs) -> Self {
@@ -35,7 +35,7 @@ macro_rules! define_operator_condition{
             }
         }
 
-        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S>> SqlCondition<S>
+        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> SqlCondition<S>
             for $type_name<S, Lhs, Rhs>
         {
             fn write_sql_string<'s, 'a>(
@@ -50,6 +50,24 @@ macro_rules! define_operator_condition{
                 write!(f, stringify!($operator))?;
                 self.rhs.write_sql_string(f, parameter_binder)?;
                 Ok(())
+            }
+        }
+
+        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> SqlExpression<S>
+            for $type_name<S, Lhs, Rhs>
+        {
+            type SqlType = SqlBool;
+            type RustType = bool;
+
+            fn write_sql_string<'s, 'a>(
+                &'s self,
+                f: &mut String,
+                parameter_binder: &mut ParameterBinder<'a>,
+            ) -> std::fmt::Result
+            where
+                's: 'a,
+            {
+                <Self as SqlCondition<S>>::write_sql_string(self, f, parameter_binder)
             }
         }
     }
