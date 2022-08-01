@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::types::IntoSqlType;
+use crate::sql::IntoSqlType;
 
 /// A typed cons list of fields.
 pub trait FieldsConsListItem {}
@@ -31,8 +31,3 @@ impl<const CHAR: char, Next: FieldNameCharsConsListItem> FieldNameCharsConsListI
     for FieldNameCharsConsListCons<CHAR, Next>
 {
 }
-
-/// A nil item of a types cons list.
-pub struct TypedConsListNil;
-impl FieldsConsListItem for TypedConsListNil {}
-impl FieldNameCharsConsListItem for TypedConsListNil {}

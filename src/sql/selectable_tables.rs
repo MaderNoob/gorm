@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{table::Table, util::TypesNotEqual};
+use crate::{sql::Table, util::TypesNotEqual};
 
 /// A list of tables from which columns can be used in an sql expression.
 pub trait SelectableTables {}
@@ -18,8 +18,8 @@ impl<T: Table> SelectableTablesContains<T> for T {}
 // a cons list item is a `SelectableTables`
 impl<T: Table, N: SelectableTables> SelectableTables for SelectableTablesCons<T, N> {}
 
-// a cons list item contains the Table it holds, and everything else that its next holds which is
-// not the same as the table it holds.
+// a cons list item contains the Table it holds, and everything else that its
+// next holds which is not the same as the table it holds.
 impl<T: Table, N: SelectableTables> SelectableTablesContains<T> for SelectableTablesCons<T, N> {}
 impl<T: Table, N: SelectableTables, InnerT: Table> SelectableTablesContains<InnerT>
     for SelectableTablesCons<T, N>
@@ -43,10 +43,10 @@ impl<T: Table + SelectableTables, CombineWith: SelectableTables>
 pub type CombinedSelectableTables<A, B> = <A as CombineSelectableTables<B>>::Combined;
 
 impl<
-        T: Table,
-        N: SelectableTables + CombineSelectableTables<CombineWith>,
-        CombineWith: SelectableTables,
-    > CombineSelectableTables<CombineWith> for SelectableTablesCons<T, N>
+    T: Table,
+    N: SelectableTables + CombineSelectableTables<CombineWith>,
+    CombineWith: SelectableTables,
+> CombineSelectableTables<CombineWith> for SelectableTablesCons<T, N>
 {
     type Combined = SelectableTablesCons<T, CombinedSelectableTables<N, CombineWith>>;
 }

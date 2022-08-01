@@ -1,8 +1,8 @@
-use std::fmt::Write;
-use std::marker::PhantomData;
+use std::{fmt::Write, marker::PhantomData};
 
 use crate::{
-    bound_parameters::ParameterBinder, statements::SqlStatement, table::Table,
+    sql::{ParameterBinder, Table},
+    statements::SqlStatement,
     util::TypedConsListNil,
 };
 

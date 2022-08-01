@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use convert_case::{Case, Casing};
 use darling::{FromDeriveInput, FromField};
 use proc_macro::TokenStream;
@@ -5,7 +7,7 @@ use proc_macro2::Ident;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
     parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::As,
-    DeriveInput, Expr, Token, Type, ExprParen,
+    DeriveInput, Expr, ExprParen, Token, Type,
 };
 
 #[proc_macro]
@@ -21,7 +23,8 @@ impl Parse for RawSelectedValue {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let selected_expr: Expr = input.parse()?;
 
-        // if the cast is used without parentheses, extract the `as <name>` from the expression.
+        // if the cast is used without parentheses, extract the `as <name>` from the
+        // expression.
         if let Expr::Cast(expr_cast) = selected_expr {
             let as_tokenstream: TokenStream = expr_cast.ty.into_token_stream().into();
             let as_ident: Ident = syn::parse(as_tokenstream)?;
@@ -65,15 +68,20 @@ struct SelectedValue {
     selected_expr: Expr,
     select_as: Ident,
 
-    /// should an explicit `as <name>` be added to this value when formatting it to sql.
-    /// This will be true for complicated expressions, but false for example for `person::name`.
+    /// should an explicit `as <name>` be added to this value when formatting it
+    /// to sql. This will be true for complicated expressions, but false for
+    /// example for `person::name`.
     should_use_explicit_as_in_sql: bool,
 }
 
 #[proc_macro]
 pub fn select_values(input_tokens: TokenStream) -> TokenStream {
     let raw_select_values_input = parse_macro_input!(input_tokens as RawSelectValuesInput);
-    let mut values = Vec::with_capacity(raw_select_values_input.values.len());
+    let mut values: Vec<SelectedValue> = Vec::with_capacity(raw_select_values_input.values.len());
+
+    // make sure that there are no duplicate names
+    let mut names_already_in_use = HashSet::new();
+
     for raw_value in raw_select_values_input.values {
         let value = match raw_value.select_as {
             Some(select_as) => SelectedValue {
@@ -100,68 +108,82 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
                         }.into()
                     }
                 }
-            }
+            },
         };
+
+        // if the name is already used, return an error
+        if !names_already_in_use.insert(value.select_as.to_string()) {
+            return quote_spanned!{
+                value.selected_expr.span() => compile_error!("can't select 2 values with the same name")
+            }.into();
+        }
+
         values.push(value);
     }
 
-    let select_values_input = SelectValuesInput{
-        values
-    };
+    let select_values_input = SelectValuesInput { values };
 
     // the definition of the generics, for example: `E0,E1,E2`
-    let struct_expr_generics_definition = (0..select_values_input.values.len()).map(|i|{
+    let struct_expr_generics_definition = (0..select_values_input.values.len()).map(|i| {
         let generic_name = Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
-        quote!{
-            #generic_name: ::gorm::expr::SqlExpression<S>
+        quote! {
+            #generic_name: ::gorm::sql::SqlExpression<S>
         }
     });
 
-    let struct_generics_definition = quote!{
-        S: ::gorm::selectable_tables::SelectableTables,
+    let struct_generics_definition = quote! {
+        S: ::gorm::sql::SelectableTables,
         #(#struct_expr_generics_definition),*
     };
     let struct_generics_definition_clone = struct_generics_definition.clone();
 
-    let struct_tuple_fields_definition = (0..select_values_input.values.len()).map(|i|{
-        Ident::new(&format!("E{}", i), proc_macro2::Span::call_site())
-    });
+    let struct_tuple_fields_definition = (0..select_values_input.values.len())
+        .map(|i| Ident::new(&format!("E{}", i), proc_macro2::Span::call_site()));
 
-    let use_expr_generics_in_impl = (0..select_values_input.values.len()).map(|i|{
-        Ident::new(&format!("E{}", i), proc_macro2::Span::call_site())
-    });
+    let use_expr_generics_in_impl = (0..select_values_input.values.len())
+        .map(|i| Ident::new(&format!("E{}", i), proc_macro2::Span::call_site()));
 
     let fields_cons_list = create_selected_values_fields_cons_list(&select_values_input);
 
-    let write_selected_expressions_sql_string = select_values_input.values.iter().enumerate().map(|(i,selected_value)|{
-        let as_and_comma_string = if selected_value.should_use_explicit_as_in_sql{
-            let select_as = selected_value.select_as.to_string();
-            format!(" as {},", select_as)
-        }else{
-            ",".to_string()
-        };
+    let write_selected_expressions_sql_string =
+        select_values_input
+            .values
+            .iter()
+            .enumerate()
+            .map(|(i, selected_value)| {
+                let write_as_sql_string = if selected_value.should_use_explicit_as_in_sql {
+                    let select_as = selected_value.select_as.to_string();
+                    let as_sql_string = format!(" as {}", select_as);
 
-        // as long as it's not the last item, write the comma
-        let write_as_and_comma_string = if i+1 < select_values_input.values.len(){
-            quote!{
-                write!(f, #as_and_comma_string)?;
-            }
-        }else{
-            quote!{}
-        };
+                    quote! {
+                        write!(f, #as_sql_string)?;
+                    }
+                } else {
+                    quote! {}
+                };
 
+                // as long as it's not the last item, write the comma
+                let write_comma_string = if i + 1 < select_values_input.values.len() {
+                    quote! {
+                        write!(f, ",")?;
+                    }
+                } else {
+                    quote! {}
+                };
 
-        let field_index = syn::Index::from(i);
+                let field_index = syn::Index::from(i);
 
-        quote!{
-            self.#field_index.write_sql_string(f, parameter_binder)?;
-            #write_as_and_comma_string
-        }
-    });
+                quote! {
+                    self.#field_index.write_sql_string(f, parameter_binder)?;
+                    #write_as_sql_string
+                    #write_comma_string
+                }
+            });
 
-    let create_instance_tuple_values = select_values_input.values.iter().map(|selected_value|{
-        &selected_value.selected_expr
-    });
+    let create_instance_tuple_values = select_values_input
+        .values
+        .iter()
+        .map(|selected_value| &selected_value.selected_expr);
 
     quote! {
         {
@@ -169,17 +191,17 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
                 #(#struct_tuple_fields_definition),* ,
                 ::std::marker::PhantomData<S>,
             );
-            
+
             #[automatically_derived]
-            impl<#struct_generics_definition_clone> 
-                ::gorm::selected_values::SelectedValues<S> for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
+            impl<#struct_generics_definition_clone>
+                ::gorm::sql::SelectedValues<S> for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
             {
                 type Fields = #fields_cons_list;
 
                 fn write_sql_string<'s, 'a>(
                     &'s self,
                     f: &mut ::std::string::String,
-                    parameter_binder: &mut ::gorm::bound_parameters::ParameterBinder<'a>,
+                    parameter_binder: &mut ::gorm::sql::ParameterBinder<'a>,
                 ) -> ::std::fmt::Result
                 where 's: 'a
                 {
@@ -195,22 +217,25 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
     }.into()
 }
 
-fn create_selected_values_fields_cons_list(select_values_input: &SelectValuesInput)->proc_macro2::TokenStream{
+fn create_selected_values_fields_cons_list(
+    select_values_input: &SelectValuesInput,
+) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each field.
     let mut cur = quote! { ::gorm::TypedConsListNil };
 
-    for (i,selected_value) in select_values_input.values.iter().enumerate().rev(){
+    for (i, selected_value) in select_values_input.values.iter().enumerate().rev() {
         // safe to unwrap here because only structs with named fields are allowed.
         let field_name = selected_value.select_as.to_string();
         let field_name_type = generate_field_name_cons_list_type(&field_name);
 
-        let selected_expr_generic_ident = Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
-        let field_type = quote!{
+        let selected_expr_generic_ident =
+            Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
+        let field_type = quote! {
             #selected_expr_generic_ident::RustType
         };
 
         cur = quote! {
-            ::gorm::fields_list::FieldsConsListCons<
+            ::gorm::sql::FieldsConsListCons<
                 #field_name_type,
                 #field_type,
                 #cur
@@ -247,11 +272,12 @@ pub fn from_query_result(input_tokens: TokenStream) -> TokenStream {
     }
 
     let field_names = fields.iter().map(|field| &field.ident);
-    let fields_type = generate_fields_cons_list_type(fields.iter().map(|field| (&field.ident, &field.ty)));
+    let fields_type =
+        generate_fields_cons_list_type(fields.iter().map(|field| (&field.ident, &field.ty)));
 
     quote!{
         #[automatically_derived]
-        impl ::gorm::from_query_result::FromQueryResult for #struct_ident
+        impl ::gorm::FromQueryResult for #struct_ident
         {
             type Fields = #fields_type;
 
@@ -267,7 +293,6 @@ pub fn from_query_result(input_tokens: TokenStream) -> TokenStream {
         }
     }.into()
 }
-
 
 #[proc_macro_derive(Table, attributes(table))]
 pub fn table(input_tokens: TokenStream) -> TokenStream {
@@ -314,7 +339,8 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     let table_field_structs = fields
         .iter()
         .map(|field| field.generate_table_field_struct());
-    let fields_type = generate_fields_cons_list_type(fields.iter().map(|field| (&field.ident, &field.ty)));
+    let fields_type =
+        generate_fields_cons_list_type(fields.iter().map(|field| (&field.ident, &field.ty)));
 
     let table_name_ident = Ident::new(&table_name, table_struct_ident.span());
 
@@ -342,9 +368,9 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     return quote! {
         #[automatically_derived]
-        impl ::gorm::table::Table for #table_struct_ident {
+        impl ::gorm::sql::Table for #table_struct_ident {
             type Fields = #fields_type;
-            const FIELDS: &'static [::gorm::table::TableField] = &[
+            const FIELDS: &'static [::gorm::sql::TableField] = &[
                 #( #table_field_structs ),*
             ];
             const TABLE_NAME: &'static ::std::primitive::str = #table_name;
@@ -352,7 +378,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         }
 
         #[automatically_derived]
-        impl ::gorm::from_query_result::FromQueryResult for #table_struct_ident
+        impl ::gorm::FromQueryResult for #table_struct_ident
         {
             type Fields = #fields_type;
 
@@ -388,7 +414,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 struct FromQueryResultInput {
     ident: Ident,
     generics: syn::Generics,
-    data: darling::ast::Data<(), TableInputField>,
+    data: darling::ast::Data<(), FromQueryResultInputField>,
 }
 
 #[derive(Debug, FromField)]
@@ -421,11 +447,11 @@ impl TableInputField {
         let ty = &self.ty;
         let sql_type_name = if is_primary_key {
             quote! {
-                <<#ty as ::gorm::types::IntoSqlSerialType>::SqlSerialType as ::gorm::types::SqlSerialType>::SQL_NAME
+                <<#ty as ::gorm::sql::IntoSqlSerialType>::SqlSerialType as ::gorm::sql::SqlSerialType>::SQL_NAME
             }
         } else {
             quote! {
-                <<#ty as ::gorm::types::IntoSqlType>::SqlType as ::gorm::types::SqlType>::SQL_NAME
+                <<#ty as ::gorm::sql::IntoSqlType>::SqlType as ::gorm::sql::SqlType>::SQL_NAME
             }
         };
         let foreign_key_to_table_name = match &self.foreign_key {
@@ -435,12 +461,12 @@ impl TableInputField {
                 quote! {
                     Some(<#foreign_key_table_struct_ident as ::gorm::Table>::TABLE_NAME)
                 }
-            }
+            },
             None => quote! { None },
         };
 
         quote! {
-            ::gorm::table::TableField {
+            ::gorm::sql::TableField {
                 name: stringify!(#name),
                 is_primary_key: #is_primary_key,
                 foreign_key_to_table_name: #foreign_key_to_table_name,
@@ -456,7 +482,7 @@ fn generate_field_name_cons_list_type(field_name: &str) -> proc_macro2::TokenStr
 
     for chr in field_name.chars().rev() {
         cur = quote! {
-            ::gorm::fields_list::FieldNameCharsConsListCons<#chr, #cur>
+            ::gorm::sql::FieldNameCharsConsListCons<#chr, #cur>
         };
     }
 
@@ -475,7 +501,7 @@ fn generate_fields_cons_list_type<'a>(
         let field_name_type = generate_field_name_cons_list_type(&field_name);
         let field_type = &field.1;
         cur = quote! {
-            ::gorm::fields_list::FieldsConsListCons<
+            ::gorm::sql::FieldsConsListCons<
                 #field_name_type,
                 #field_type,
                 #cur
@@ -496,10 +522,10 @@ fn generate_column_struct(
         pub struct #column_name_ident;
 
         #[automatically_derived]
-        impl ::gorm::table::Column for #column_name_ident {
+        impl ::gorm::sql::Column for #column_name_ident {
             const COLUMN_NAME:&'static str = #column_name;
             type Table = super::#table_struct_ident;
-            type SqlType = <#column_type as ::gorm::types::IntoSqlType>::SqlType;
+            type SqlType = <#column_type as ::gorm::sql::IntoSqlType>::SqlType;
             type RustType = #column_type;
         }
     }
@@ -510,7 +536,7 @@ fn generate_table_marker(table_struct_ident: &Ident) -> proc_macro2::TokenStream
         pub struct table;
 
         #[automatically_derived]
-        impl ::gorm::table::TableMarker for table {
+        impl ::gorm::sql::TableMarker for table {
             type Table = super::#table_struct_ident;
         }
     }
@@ -526,7 +552,7 @@ fn generate_foreign_key_impl(
 
     quote! {
         #[automatically_derived]
-        impl ::gorm::table::HasForeignKey<#other_table_ident> for #table_struct_ident {
+        impl ::gorm::sql::HasForeignKey<#other_table_ident> for #table_struct_ident {
             type ForeignKeyColumn = #table_name_ident::#foreign_key_column_ident;
         }
     }

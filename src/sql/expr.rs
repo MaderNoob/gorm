@@ -1,14 +1,9 @@
 use std::fmt::Write;
 
-use crate::{
-    bound_parameters::ParameterBinder,
-    condition::{
-        SqlConditionEq, SqlConditionGreaterEquals, SqlConditionGreaterThan,
-        SqlConditionLowerEquals, SqlConditionLowerThan, SqlConditionNotEq,
-    },
-    selectable_tables::{SelectableTables, SelectableTablesContains},
-    table::{Column, Table},
-    types::{IntoSqlType, OrderableSqlType, SqlText, SqlType},
+use crate::sql::{
+    Column, IntoSqlType, OrderableSqlType, ParameterBinder, SelectableTables,
+    SelectableTablesContains, SqlConditionEq, SqlConditionGreaterEquals, SqlConditionGreaterThan,
+    SqlConditionLowerEquals, SqlConditionLowerThan, SqlConditionNotEq, SqlText, SqlType, Table,
 };
 
 /// An sql expression
@@ -16,7 +11,8 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
     type SqlType: SqlType;
     type RustType: IntoSqlType;
 
-    /// Writes the sql expression as an sql string which can be evaluated by the database.
+    /// Writes the sql expression as an sql string which can be evaluated by the
+    /// database.
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -25,7 +21,8 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
     where
         's: 'a;
 
-    /// Returns a condition which will be true if the given expression is equal to this one.
+    /// Returns a condition which will be true if the given expression is equal
+    /// to this one.
     // only allow equality for expression with the same value type
     fn equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
@@ -34,7 +31,8 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
         SqlConditionEq::new(self, other)
     }
 
-    /// Returns a condition which will be true if the given expression is not equal to this one.
+    /// Returns a condition which will be true if the given expression is not
+    /// equal to this one.
     // only allow equality for expression with the same value type
     fn not_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
@@ -49,8 +47,8 @@ impl<S: SelectableTables, C: Column> SqlExpression<S> for C
 where
     S: SelectableTablesContains<<C as Column>::Table>,
 {
-    type SqlType = <C as Column>::SqlType;
     type RustType = <C as Column>::RustType;
+    type SqlType = <C as Column>::SqlType;
 
     fn write_sql_string<'s, 'a>(
         &'s self,
@@ -70,28 +68,32 @@ where
 }
 
 pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S> {
-    /// Returns a condition which will be true if this expression is lower than the given one.
+    /// Returns a condition which will be true if this expression is lower than
+    /// the given one.
     // only allow comparing with expression with the same value type
     fn lower_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
     ) -> SqlConditionLowerThan<S, Self, O>;
 
-    /// Returns a condition which will be true if this expression is lower or equal to the given one.
+    /// Returns a condition which will be true if this expression is lower or
+    /// equal to the given one.
     // only allow comparing with expression with the same value type
     fn lower_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
     ) -> SqlConditionLowerEquals<S, Self, O>;
 
-    /// Returns a condition which will be true if this expression is greater than the given one.
+    /// Returns a condition which will be true if this expression is greater
+    /// than the given one.
     // only allow comparing with expression with the same value type
     fn greater_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
     ) -> SqlConditionGreaterThan<S, Self, O>;
 
-    /// Returns a condition which will be true if this expression is greater or equal to the given one.
+    /// Returns a condition which will be true if this expression is greater or
+    /// equal to the given one.
     // only allow comparing with expression with the same value type
     fn greater_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
@@ -168,8 +170,8 @@ macro_rules! impl_primitive_expression{
 impl_primitive_expression! {bool, i16, i32, i64, f32, f64}
 
 impl<'b, S: SelectableTables> SqlExpression<S> for &'b str {
-    type SqlType = SqlText;
     type RustType = &'b str;
+    type SqlType = SqlText;
 
     fn write_sql_string<'s, 'a>(
         &'s self,

@@ -1,13 +1,11 @@
-use std::fmt::Write;
-use std::marker::PhantomData;
+use std::{fmt::Write, marker::PhantomData};
 
-use crate::{
-    bound_parameters::ParameterBinder, expr::SqlExpression, selectable_tables::SelectableTables,
-};
+use crate::sql::{ParameterBinder, SelectableTables, SqlExpression};
 
 /// A condition in a where clause.
 pub trait SqlCondition<S: SelectableTables> {
-    /// Writes the condition as an sql string which can be used in a where clause.
+    /// Writes the condition as an sql string which can be used in a where
+    /// clause.
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,

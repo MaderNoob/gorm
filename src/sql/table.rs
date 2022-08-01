@@ -1,7 +1,6 @@
 use crate::{
-    fields_list::FieldsConsListItem,
+    sql::{FieldsConsListItem, IntoSqlType, SqlType},
     statements::{CreateTableStatement, DropTableStatement},
-    types::{SqlType, IntoSqlType},
 };
 
 /// A table in the database.
@@ -28,8 +27,8 @@ pub trait Column {
     type RustType: IntoSqlType;
 }
 
-/// A trait for representing a table marker, which is an empty type which is used to reference a
-/// table.
+/// A trait for representing a table marker, which is an empty type which is
+/// used to reference a table.
 pub trait TableMarker: Sized + 'static {
     type Table: Table;
 

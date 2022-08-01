@@ -1,13 +1,15 @@
-use crate::{error::*, from_query_result::FromQueryResult, SqlStatement};
 use async_trait::async_trait;
 
+use crate::{error::*, sql::FromQueryResult, statements::SqlStatement};
+
 pub mod connection;
-// pub mod pool;
+
+pub use connection::*;
 
 /// An executor which can execute sql statements
 #[async_trait]
 pub trait SqlStatementExecutor: Sized {
-    async fn execute(&self, statement: impl crate::SqlStatement + Send) -> Result<ExecuteResult>;
+    async fn execute(&self, statement: impl SqlStatement + Send) -> Result<ExecuteResult>;
 
     async fn load_one<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,

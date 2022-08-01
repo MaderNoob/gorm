@@ -1,12 +1,9 @@
-use crate::{
-    error::*, execution::ExecuteResult, from_query_result::FromQueryResult,
-    statements::SqlStatement,
-};
 use async_trait::async_trait;
 use futures::{pin_mut, TryStreamExt};
 use tokio_postgres::{Client, NoTls};
 
 use super::SqlStatementExecutor;
+use crate::{error::*, execution::ExecuteResult, sql::FromQueryResult, statements::SqlStatement};
 
 /// An database connection.
 pub struct DatabaseConnection {
@@ -31,7 +28,10 @@ impl DatabaseConnection {
 
 #[async_trait]
 impl SqlStatementExecutor for DatabaseConnection {
-    async fn execute(&self, statement: impl crate::SqlStatement + Send) -> Result<ExecuteResult> {
+    async fn execute(
+        &self,
+        statement: impl crate::statements::SqlStatement + Send,
+    ) -> Result<ExecuteResult> {
         let (query_string, parameter_binder) = statement.build();
         let rows_modified = self
             .client

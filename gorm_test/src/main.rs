@@ -1,19 +1,9 @@
-use std::marker::PhantomData;
-
-use gorm::expr::OrderableSqlExpression;
-use gorm::expr::SqlExpression;
-use gorm::table::TableMarker;
-use gorm::ExecuteSqlStatment;
-use gorm::FromQueryResult;
-use gorm::SelectFrom;
-use gorm::Table;
 use gorm::{
-    connection::DatabaseConnection, select_values, selectable_tables::CombinedSelectableTables,
-    InnerJoined,
-};
-use gorm::{
-    selectable_tables::SelectableTables, selected_values::SelectedValues, InnerJoinTrait,
-    TypedConsListNil,
+    execution::DatabaseConnection,
+    select_values,
+    sql::{OrderableSqlExpression, TableMarker},
+    statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom},
+    FromQueryResult, Table,
 };
 
 #[tokio::main]
@@ -36,11 +26,18 @@ async fn main() {
         .await
         .unwrap();
 
+    #[derive(Debug, FromQueryResult)]
+    struct PersonNameAndSchoolName {
+        name: String,
+        school_name: String,
+    }
+
     let p = person::table
         .inner_join(school::table)
         .find()
         .filter(school::id.greater_equals(1))
-        .load_all::<Person>(&client)
+        .select(select_values!(person::name, school::name as school_name))
+        .load_all::<PersonNameAndSchoolName>(&client)
         .await
         .unwrap();
 

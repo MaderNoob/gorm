@@ -1,14 +1,9 @@
-use std::fmt::Write;
-use std::marker::PhantomData;
+use std::{fmt::Write, marker::PhantomData};
 
 use super::SqlStatement;
-use crate::{
-    bound_parameters::ParameterBinder,
-    condition::SqlCondition,
-    selectable_tables::{CombineSelectableTables, CombinedSelectableTables, SelectableTables},
-    selected_values::SelectedValues,
-    table::{Column, HasForeignKey, TableMarker},
-    Table,
+use crate::sql::{
+    Column, CombineSelectableTables, CombinedSelectableTables, HasForeignKey, ParameterBinder,
+    SelectableTables, SelectedValues, SqlCondition, Table, TableMarker,
 };
 
 /// An sql statement for finding records in a table
@@ -61,6 +56,19 @@ pub struct SelectStatementCustomValues<S: SelectFrom, V: SelectedValues<S::Selec
     phantom: PhantomData<S>,
 }
 
+impl<S: SelectFrom, V: SelectedValues<S::SelectableTables>> SelectStatementCustomValues<S, V> {
+    pub fn filter<C: SqlCondition<<S as SelectFrom>::SelectableTables>>(
+        self,
+        condition: C,
+    ) -> FilteredSelectStatementCustomValues<S, V, C> {
+        FilteredSelectStatementCustomValues {
+            condition,
+            values: self.values,
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<S: SelectFrom + 'static, V: SelectedValues<S::SelectableTables> + 'static> SqlStatement
     for SelectStatementCustomValues<S, V>
 {
@@ -91,6 +99,21 @@ pub struct FilteredSelectStatement<
     phantom: PhantomData<S>,
 }
 
+impl<S: SelectFrom, C: SqlCondition<<S as SelectFrom>::SelectableTables>>
+    FilteredSelectStatement<S, C>
+{
+    pub fn select<V: SelectedValues<S::SelectableTables>>(
+        self,
+        selected_values: V,
+    ) -> FilteredSelectStatementCustomValues<S, V, C> {
+        FilteredSelectStatementCustomValues {
+            values: selected_values,
+            condition: self.condition,
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<S: SelectFrom + 'static, C: SqlCondition<S::SelectableTables> + 'static> SqlStatement
     for FilteredSelectStatement<S, C>
 {
@@ -106,8 +129,46 @@ impl<S: SelectFrom + 'static, C: SqlCondition<S::SelectableTables> + 'static> Sq
     {
         write!(f, "SELECT * FROM ")?;
         S::write_sql_from_string(f)?;
-        write!(f, " where ")?;
+        write!(f, " WHERE ")?;
         self.condition.write_sql_string(f, parameter_binder)
+    }
+}
+
+/// An sql statement for finding records in a table matching some condition
+/// which selects custom values.
+pub struct FilteredSelectStatementCustomValues<
+    S: SelectFrom,
+    V: SelectedValues<S::SelectableTables>,
+    C: SqlCondition<<S as SelectFrom>::SelectableTables>,
+> {
+    condition: C,
+    values: V,
+    phantom: PhantomData<S>,
+}
+
+impl<
+    S: SelectFrom + 'static,
+    V: SelectedValues<S::SelectableTables> + 'static,
+    C: SqlCondition<<S as SelectFrom>::SelectableTables> + 'static,
+> SqlStatement for FilteredSelectStatementCustomValues<S, V, C>
+{
+    type OutputFields = V::Fields;
+
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "SELECT ")?;
+        self.values.write_sql_string(f, parameter_binder)?;
+        write!(f, " FROM ")?;
+        S::write_sql_from_string(f)?;
+        write!(f, " WHERE ")?;
+        self.condition.write_sql_string(f, parameter_binder)?;
+        Ok(())
     }
 }
 
@@ -121,9 +182,10 @@ pub trait SelectFrom: Sized {
     /// Writes the `from` part of the sql query as an sql string.
     fn write_sql_from_string(f: &mut String) -> std::fmt::Result;
 
-    /// Writes the `from` part of the sql query without its left part an sql string.
-    /// For example for `T: Table` this will write an empty string (`""`),
-    ///  and for `InnerJoin<T1: Table, T2: Table>` this will write `"INNER JOIN T2 ON .."`.
+    /// Writes the `from` part of the sql query without its left part an sql
+    /// string. For example for `T: Table` this will write an empty string
+    /// (`""`),  and for `InnerJoin<T1: Table, T2: Table>` this will write
+    /// `"INNER JOIN T2 ON .."`.
     fn write_sql_from_string_without_left(f: &mut String) -> std::fmt::Result;
 
     /// Creates a select statement which finds records in this source.
@@ -133,9 +195,8 @@ pub trait SelectFrom: Sized {
 }
 
 impl<T: TableMarker> SelectFrom for T {
-    type SelectableTables = T::Table;
-
     type LeftMostTable = T::Table;
+    type SelectableTables = T::Table;
 
     fn write_sql_from_string(f: &mut String) -> std::fmt::Result {
         write!(f, "\"{}\"", T::Table::TABLE_NAME)
@@ -157,9 +218,8 @@ where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
     A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
 {
-    type SelectableTables = CombinedSelectableTables<A::SelectableTables, B::SelectableTables>;
-
     type LeftMostTable = A::LeftMostTable;
+    type SelectableTables = CombinedSelectableTables<A::SelectableTables, B::SelectableTables>;
 
     fn write_sql_from_string(f: &mut String) -> std::fmt::Result {
         A::write_sql_from_string(f)?;

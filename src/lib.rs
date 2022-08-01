@@ -3,18 +3,14 @@
 #![feature(generic_associated_types)]
 
 mod error;
-mod execution;
-mod sql;
-mod statements;
+pub mod execution;
+pub mod sql;
+pub mod statements;
 mod util;
 
 pub use error::*;
-pub use execution::*;
-pub use sql::table::Table;
-pub use sql::*;
-pub use statements::*;
-pub use util::*;
-
-pub use gorm_macros::{Table, FromQueryResult, select_values};
+pub use gorm_macros::{select_values, FromQueryResult, Table};
 pub use paste;
+pub use sql::{FromQueryResult, Table};
 pub use tokio_postgres;
+pub use util::*;

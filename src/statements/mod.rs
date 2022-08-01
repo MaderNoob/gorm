@@ -2,23 +2,24 @@ mod create_table;
 mod drop_table;
 mod select;
 
-use crate::{
-    bound_parameters::ParameterBinder, error::*, from_query_result::FromQueryResult, ExecuteResult,
-};
-
 use async_trait::async_trait;
 pub use create_table::*;
 pub use drop_table::*;
 pub use select::*;
 
-use crate::{execution::SqlStatementExecutor, fields_list::FieldsConsListItem};
+use crate::{
+    error::*,
+    execution::{ExecuteResult, SqlStatementExecutor},
+    sql::{FieldsConsListItem, FromQueryResult, ParameterBinder},
+};
 
 /// An sql statement which can be executed by a database.
 pub trait SqlStatement: Sized + 'static {
     /// The fields of the output of this statement.
     type OutputFields: FieldsConsListItem;
 
-    /// Writes the sql statement as an sql string which can be executed by a database.
+    /// Writes the sql statement as an sql string which can be executed by a
+    /// database.
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,

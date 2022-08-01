@@ -102,7 +102,6 @@ define_sql_type! { serial Serial16, "smallserial" => i16  }
 define_sql_type! { serial Serial32, "serial" => i32 }
 define_sql_type! { serial Serial64, "bigserial" => i64 }
 
-impl<'a> IntoSqlType for &'a str{
+impl<'a> IntoSqlType for &'a str {
     type SqlType = SqlText;
 }
-
