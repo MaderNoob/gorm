@@ -17,6 +17,7 @@ pub struct TableField {
     pub is_primary_key: bool,
     pub foreign_key_to_table_name: Option<&'static str>,
     pub sql_type_name: &'static str,
+    pub is_null: bool,
 }
 
 /// A column of a table

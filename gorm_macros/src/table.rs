@@ -141,15 +141,18 @@ impl TableInputField {
         let name = self.ident.as_ref().unwrap();
         let is_primary_key = name == "id";
         let ty = &self.ty;
-        let sql_type_name = if is_primary_key {
+        let as_sql_type_trait = if is_primary_key {
             quote! {
-                <<#ty as ::gorm::sql::IntoSqlSerialType>::SqlSerialType as ::gorm::sql::SqlSerialType>::SQL_NAME
+                <<#ty as ::gorm::sql::IntoSqlSerialType>::SqlSerialType as ::gorm::sql::SqlSerialType>
             }
         } else {
             quote! {
-                <<#ty as ::gorm::sql::IntoSqlType>::SqlType as ::gorm::sql::SqlType>::SQL_NAME
+                <<#ty as ::gorm::sql::IntoSqlType>::SqlType as ::gorm::sql::SqlType>
             }
         };
+        let sql_type_name = quote! { #as_sql_type_trait::SQL_NAME };
+        let is_null = quote! { #as_sql_type_trait::IS_NULL };
+
         let foreign_key_to_table_name = match &self.foreign_key {
             Some(foreign_key_table_struct_name) => {
                 let foreign_key_table_struct_ident =
@@ -167,6 +170,7 @@ impl TableInputField {
                 is_primary_key: #is_primary_key,
                 foreign_key_to_table_name: #foreign_key_to_table_name,
                 sql_type_name: #sql_type_name,
+                is_null: #is_null,
             }
         }
     }

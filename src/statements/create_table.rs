@@ -69,7 +69,7 @@ fn generate_create_table_columns_sql_string(fields: &[TableField]) -> String {
         fields_string.push_str(field_info.sql_type_name);
         if field_info.is_primary_key {
             fields_string.push_str(" PRIMARY KEY");
-        } else {
+        } else if !field_info.is_null {
             fields_string.push_str(" NOT NULL");
         }
 

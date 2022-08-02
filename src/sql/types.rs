@@ -4,12 +4,14 @@ use rust_decimal::Decimal;
 pub trait SqlType {
     type RustType: IntoSqlType<SqlType = Self>;
     const SQL_NAME: &'static str;
+    const IS_NULL:bool;
 }
 
 /// An sql serial type.
 pub trait SqlSerialType {
     type RustType: IntoSqlSerialType<SqlSerialType = Self>;
     const SQL_NAME: &'static str;
+    const IS_NULL:bool;
 }
 
 /// A trait used to convert a rust type to its sql type.
@@ -30,6 +32,7 @@ macro_rules! define_generic_sql_type {
         impl SqlType for $sql_type_name{
             type RustType = $rust_type;
             const SQL_NAME:&'static str = $sql_name;
+            const IS_NULL:bool = false;
         }
         impl IntoSqlType for $rust_type {
             type SqlType = $sql_type_name;
@@ -50,6 +53,7 @@ macro_rules! define_sql_type {
         impl SqlSerialType for $sql_serial_type_name{
             type RustType = $serial_rust_type;
             const SQL_NAME:&'static str = $serial_sql_name;
+            const IS_NULL:bool = false;
         }
         impl IntoSqlSerialType for $serial_rust_type {
             type SqlSerialType = $sql_serial_type_name;
@@ -71,6 +75,16 @@ define_sql_type! { serial Serial64, "bigserial" => i64 }
 
 impl<'a> IntoSqlType for &'a str {
     type SqlType = SqlText;
+}
+
+pub struct SqlOption<T: SqlType>(T);
+impl<T: SqlType> SqlType for SqlOption<T>{
+    type RustType = Option<T::RustType>;
+    const SQL_NAME: &'static str = T::SQL_NAME;
+    const IS_NULL:bool = true;
+}
+impl<T:IntoSqlType> IntoSqlType for Option<T>{
+    type SqlType = SqlOption<T::SqlType>;
 }
 
 pub trait OrderableSqlType {}
