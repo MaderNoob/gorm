@@ -3,7 +3,7 @@ use std::{fmt::Write, marker::PhantomData};
 use super::SqlStatement;
 use crate::sql::{
     Column, CombineSelectableTables, CombinedSelectableTables, HasForeignKey, ParameterBinder,
-    SelectableTables, SelectedValues, SqlCondition, Table, TableMarker,
+    SelectableTables, SelectedValues, SqlCondition, SqlExpression, Table, TableMarker,
 };
 
 /// An sql statement for finding records in a table
@@ -69,6 +69,21 @@ impl<S: SelectFrom, V: SelectedValues<S::SelectableTables>> SelectStatementCusto
     }
 }
 
+impl<S: SelectFrom, V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true>>
+    SelectStatementCustomValues<S, V>
+{
+    pub fn group_by<G: SqlExpression<S::SelectableTables>>(
+        self,
+        group_by: G,
+    ) -> SelectStatementCustomValuesGroupedBy<S, V, G> {
+        SelectStatementCustomValuesGroupedBy {
+            group_by,
+            values: self.values,
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<S: SelectFrom + 'static, V: SelectedValues<S::SelectableTables> + 'static> SqlStatement
     for SelectStatementCustomValues<S, V>
 {
@@ -86,6 +101,42 @@ impl<S: SelectFrom + 'static, V: SelectedValues<S::SelectableTables> + 'static> 
         self.values.write_sql_string(f, parameter_binder)?;
         write!(f, " FROM ")?;
         S::write_sql_from_string(f)?;
+        Ok(())
+    }
+}
+
+pub struct SelectStatementCustomValuesGroupedBy<
+    S: SelectFrom,
+    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true>,
+    G: SqlExpression<S::SelectableTables>,
+> {
+    values: V,
+    group_by: G,
+    phantom: PhantomData<S>,
+}
+
+impl<
+    S: SelectFrom + 'static,
+    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true> + 'static,
+    G: SqlExpression<S::SelectableTables> + 'static,
+> SqlStatement for SelectStatementCustomValuesGroupedBy<S, V, G>
+{
+    type OutputFields = V::Fields;
+
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "SELECT ")?;
+        self.values.write_sql_string(f, parameter_binder)?;
+        write!(f, " FROM ")?;
+        S::write_sql_from_string(f)?;
+        write!(f, " GROUP BY ")?;
+        self.group_by.write_sql_string(f, parameter_binder)?;
         Ok(())
     }
 }
@@ -148,6 +199,25 @@ pub struct FilteredSelectStatementCustomValues<
 
 impl<
     S: SelectFrom + 'static,
+    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true> + 'static,
+    C: SqlCondition<<S as SelectFrom>::SelectableTables> + 'static,
+> FilteredSelectStatementCustomValues<S, V, C>
+{
+    pub fn group_by<G: SqlExpression<S::SelectableTables>>(
+        self,
+        group_by: G,
+    ) -> FilteredSelectStatementCustomValuesGroupedBy<S, V, C, G> {
+        FilteredSelectStatementCustomValuesGroupedBy {
+            condition: self.condition,
+            values: self.values,
+            group_by,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<
+    S: SelectFrom + 'static,
     V: SelectedValues<S::SelectableTables> + 'static,
     C: SqlCondition<<S as SelectFrom>::SelectableTables> + 'static,
 > SqlStatement for FilteredSelectStatementCustomValues<S, V, C>
@@ -168,6 +238,47 @@ impl<
         S::write_sql_from_string(f)?;
         write!(f, " WHERE ")?;
         self.condition.write_sql_string(f, parameter_binder)?;
+        Ok(())
+    }
+}
+
+pub struct FilteredSelectStatementCustomValuesGroupedBy<
+    S: SelectFrom,
+    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true>,
+    C: SqlCondition<<S as SelectFrom>::SelectableTables>,
+    G: SqlExpression<S::SelectableTables>,
+> {
+    condition: C,
+    values: V,
+    group_by: G,
+    phantom: PhantomData<S>,
+}
+
+impl<
+    S: SelectFrom + 'static,
+    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true> + 'static,
+    C: SqlCondition<<S as SelectFrom>::SelectableTables> + 'static,
+    G: SqlExpression<S::SelectableTables> + 'static,
+> SqlStatement for FilteredSelectStatementCustomValuesGroupedBy<S, V, C, G>
+{
+    type OutputFields = V::Fields;
+
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "SELECT ")?;
+        self.values.write_sql_string(f, parameter_binder)?;
+        write!(f, " FROM ")?;
+        S::write_sql_from_string(f)?;
+        write!(f, " WHERE ")?;
+        self.condition.write_sql_string(f, parameter_binder)?;
+        write!(f, " GROUP BY ")?;
+        self.group_by.write_sql_string(f, parameter_binder)?;
         Ok(())
     }
 }

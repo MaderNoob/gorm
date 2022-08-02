@@ -6,7 +6,7 @@ pub trait SqlType {
     const SQL_NAME: &'static str;
 }
 
-/// An sql type.
+/// An sql serial type.
 pub trait SqlSerialType {
     type RustType: IntoSqlSerialType<SqlSerialType = Self>;
     const SQL_NAME: &'static str;
@@ -83,7 +83,7 @@ macro_rules! mark_sql_types {
     };
 }
 
-mark_sql_types!{OrderableSqlType => SqlI16, SqlI32, SqlI64, SqlF32, SqlF64, SqlNumeric, Serial16, Serial32, Serial64, SqlText}
+mark_sql_types! {OrderableSqlType => SqlI16, SqlI32, SqlI64, SqlF32, SqlF64, SqlNumeric, Serial16, Serial32, Serial64, SqlText}
 
 pub trait AverageableSqlType {
     type OutputSqlType: SqlType;
@@ -103,30 +103,29 @@ macro_rules! mark_sql_types_with_output_type {
     };
 }
 
-mark_sql_types_with_output_type!{AverageableSqlType => 
-    SqlI16: SqlNumeric, 
-    SqlI32: SqlNumeric, 
-    SqlI64: SqlNumeric, 
-    SqlF32: SqlF64, 
-    SqlF64: SqlF64, 
-    SqlNumeric: SqlNumeric, 
+mark_sql_types_with_output_type! {AverageableSqlType =>
+    SqlI16: SqlNumeric,
+    SqlI32: SqlNumeric,
+    SqlI64: SqlNumeric,
+    SqlF32: SqlF64,
+    SqlF64: SqlF64,
+    SqlNumeric: SqlNumeric,
     Serial16: SqlNumeric,
     Serial32: SqlNumeric,
     Serial64: SqlNumeric
 }
 
-mark_sql_types_with_output_type!{SummableSqlType => 
-    SqlI16: SqlI64, 
-    SqlI32: SqlI64, 
-    SqlI64: SqlNumeric, 
-    SqlF32: SqlF32, 
-    SqlF64: SqlF64, 
-    SqlNumeric: SqlNumeric, 
+mark_sql_types_with_output_type! {SummableSqlType =>
+    SqlI16: SqlI64,
+    SqlI32: SqlI64,
+    SqlI64: SqlNumeric,
+    SqlF32: SqlF32,
+    SqlF64: SqlF64,
+    SqlNumeric: SqlNumeric,
     Serial16: SqlI64,
     Serial32: SqlI64,
     Serial64: SqlNumeric
 }
-
 
 macro_rules! mark_sql_types_with_rhs {
     ($marker_trait: ident => $($lhs: ident : ($($rhs: ident),*)),*) => {
@@ -144,8 +143,8 @@ pub trait SqlMultiply<Rhs> {}
 pub trait SqlDivide<Rhs> {}
 
 macro_rules! mark_all_number_types_with_rhs {
-    ($marker_trait: ident) => {
-        mark_sql_types_with_rhs!{ $marker_trait =>
+    ($marker_trait:ident) => {
+        mark_sql_types_with_rhs! { $marker_trait =>
             SqlI16: (SqlI16, Serial16),
             SqlI32: (SqlI32, Serial32),
             SqlI64: (SqlI64, Serial64),
@@ -159,7 +158,7 @@ macro_rules! mark_all_number_types_with_rhs {
     };
 }
 
-mark_all_number_types_with_rhs!{SqlAdd}
-mark_all_number_types_with_rhs!{SqlSubtract}
-mark_all_number_types_with_rhs!{SqlMultiply}
-mark_all_number_types_with_rhs!{SqlDivide}
+mark_all_number_types_with_rhs! {SqlAdd}
+mark_all_number_types_with_rhs! {SqlSubtract}
+mark_all_number_types_with_rhs! {SqlMultiply}
+mark_all_number_types_with_rhs! {SqlDivide}

@@ -2,6 +2,7 @@ mod from_query_result;
 mod select_values;
 mod table;
 mod util;
+mod migration;
 
 use proc_macro::TokenStream;
 use util::generate_field_name_cons_list_type;
@@ -9,6 +10,11 @@ use util::generate_field_name_cons_list_type;
 #[proc_macro]
 pub fn select_values(input_tokens: TokenStream) -> TokenStream {
     select_values::select_values(input_tokens)
+}
+
+#[proc_macro]
+pub fn migration(input_tokens: TokenStream) -> TokenStream {
+    migration::migration(input_tokens)
 }
 
 #[proc_macro_derive(FromQueryResult)]

@@ -1,8 +1,11 @@
 use std::collections::HashSet;
 
 use proc_macro::TokenStream;
-use quote::{quote_spanned, quote, ToTokens};
-use syn::{parse_macro_input, Expr, parse::Parse, Token, token::As, punctuated::Punctuated, spanned::Spanned};
+use quote::{quote, quote_spanned, ToTokens};
+use syn::{
+    parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::As, Expr,
+    Token,
+};
 
 use crate::util::generate_field_name_cons_list_type;
 
@@ -56,7 +59,8 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
 
     // the definition of the generics, for example: `E0,E1,E2`
     let struct_expr_generics_definition = (0..select_values_input.values.len()).map(|i| {
-        let generic_name = proc_macro2::Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
+        let generic_name =
+            proc_macro2::Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
         quote! {
             #generic_name: ::gorm::sql::SqlExpression<S>
         }
@@ -73,6 +77,21 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
 
     let use_expr_generics_in_impl = (0..select_values_input.values.len())
         .map(|i| proc_macro2::Ident::new(&format!("E{}", i), proc_macro2::Span::call_site()));
+
+    let is_aggregate = (0..select_values_input.values.len()).map(|i| {
+        let expr_generic_ident =
+            proc_macro2::Ident::new(&format!("E{}", i), proc_macro2::Span::call_site());
+        let is_last_item = i + 1 == select_values_input.values.len();
+        if is_last_item {
+            quote! {
+                #expr_generic_ident::IS_AGGREGATE
+            }
+        } else {
+            quote! {
+                #expr_generic_ident::IS_AGGREGATE ||
+            }
+        }
+    });
 
     let fields_cons_list = create_selected_values_fields_cons_list(&select_values_input);
 
@@ -128,6 +147,8 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
                 ::gorm::sql::SelectedValues<S> for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
             {
                 type Fields = #fields_cons_list;
+
+                const IS_AGGREGATE:bool = #(#is_aggregate)*;
 
                 fn write_sql_string<'s, 'a>(
                     &'s self,
@@ -235,4 +256,3 @@ struct SelectedValue {
     /// example for `person::name`.
     should_use_explicit_as_in_sql: bool,
 }
-

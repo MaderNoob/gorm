@@ -1,7 +1,7 @@
 use convert_case::{Case, Casing};
 use darling::{FromDeriveInput, FromField};
 use proc_macro::TokenStream;
-use quote::{quote_spanned, quote};
+use quote::{quote, quote_spanned};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Type};
 
 use crate::util::generate_fields_cons_list_type;
@@ -208,7 +208,8 @@ fn generate_foreign_key_impl(
     other_table_name: &str,
     foreign_key_column_ident: &proc_macro2::Ident,
 ) -> proc_macro2::TokenStream {
-    let other_table_ident = proc_macro2::Ident::new(other_table_name, foreign_key_column_ident.span());
+    let other_table_ident =
+        proc_macro2::Ident::new(other_table_name, foreign_key_column_ident.span());
 
     quote! {
         #[automatically_derived]

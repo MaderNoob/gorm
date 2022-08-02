@@ -36,5 +36,3 @@ pub fn generate_fields_cons_list_type<'a>(
 
     cur
 }
-
-

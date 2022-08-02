@@ -4,6 +4,8 @@ use crate::sql::{FieldsConsListItem, ParameterBinder, SelectableTables};
 pub trait SelectedValues<S: SelectableTables> {
     type Fields: FieldsConsListItem;
 
+    const IS_AGGREGATE: bool;
+
     /// Writes the selected values as an sql string which can be selected by the
     /// database.
     fn write_sql_string<'s, 'a>(

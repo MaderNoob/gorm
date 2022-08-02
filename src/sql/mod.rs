@@ -8,6 +8,7 @@ mod selectable_tables;
 mod selected_values;
 mod table;
 mod types;
+mod migration;
 
 pub use bound_parameters::ParameterBinder;
 pub use condition::*;
@@ -19,3 +20,4 @@ pub use selectable_tables::*;
 pub use selected_values::*;
 pub use table::*;
 pub use types::*;
+pub use migration::*;

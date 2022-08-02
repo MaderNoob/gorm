@@ -59,6 +59,8 @@ macro_rules! define_operator_condition{
             type SqlType = SqlBool;
             type RustType = bool;
 
+            const IS_AGGREGATE:bool = Lhs::IS_AGGREGATE || Rhs::IS_AGGREGATE;
+
             fn write_sql_string<'s, 'a>(
                 &'s self,
                 f: &mut String,
@@ -128,6 +130,8 @@ macro_rules! define_operator_condition_orderable{
         {
             type SqlType = SqlBool;
             type RustType = bool;
+
+            const IS_AGGREGATE:bool = Lhs::IS_AGGREGATE || Rhs::IS_AGGREGATE;
 
             fn write_sql_string<'s, 'a>(
                 &'s self,

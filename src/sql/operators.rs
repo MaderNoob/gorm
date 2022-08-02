@@ -2,8 +2,11 @@ use std::{fmt::Write, marker::PhantomData};
 
 use rust_decimal::Decimal;
 
-use super::{AverageableSqlType, SqlAdd, SqlDivide, SqlI64, SqlMultiply, SqlSubtract, SqlNumeric, SummableSqlType, SqlType, OrderableSqlType};
-use crate::sql::{ParameterBinder, SelectableTables, SqlExpression};
+use super::{
+    AggregateSqlExpression, AverageableSqlType, OrderableSqlType, SqlAdd, SqlDivide, SqlI64,
+    SqlMultiply, SqlNumeric, SqlSubtract, SqlType, SummableSqlType,
+};
+use crate::sql::{NonAggregateSqlExpression, ParameterBinder, SelectableTables, SqlExpression};
 
 macro_rules! define_operator{
     {$type_name: ident, $sql_type_marker: ident, $operator: tt} => {
@@ -38,6 +41,8 @@ macro_rules! define_operator{
             type SqlType = Lhs::SqlType;
             type RustType = Lhs::RustType;
 
+            const IS_AGGREGATE:bool = Lhs::IS_AGGREGATE || Rhs::IS_AGGREGATE;
+
             fn write_sql_string<'s, 'a>(
                 &'s self,
                 f: &mut String,
@@ -52,6 +57,7 @@ macro_rules! define_operator{
                 Ok(())
             }
         }
+
     }
 }
 
@@ -78,6 +84,8 @@ impl<S: SelectableTables, E: SqlExpression<S>> SqlExpression<S> for SqlCount<S, 
     type RustType = i64;
     type SqlType = SqlI64;
 
+    const IS_AGGREGATE: bool = true;
+
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -92,6 +100,8 @@ impl<S: SelectableTables, E: SqlExpression<S>> SqlExpression<S> for SqlCount<S, 
         Ok(())
     }
 }
+
+impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlCount<S, E> {}
 
 pub struct SqlAverage<S: SelectableTables, E: SqlExpression<S>>
 where
@@ -120,6 +130,8 @@ where
     type RustType = Decimal;
     type SqlType = SqlNumeric;
 
+    const IS_AGGREGATE: bool = true;
+
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -133,6 +145,11 @@ where
         write!(f, ")")?;
         Ok(())
     }
+}
+
+impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlAverage<S, E> where
+    E::SqlType: AverageableSqlType
+{
 }
 
 pub struct SqlSum<S: SelectableTables, E: SqlExpression<S>>
@@ -162,6 +179,8 @@ where
     type RustType = <<E::SqlType as SummableSqlType>::OutputSqlType as SqlType>::RustType;
     type SqlType = <E::SqlType as SummableSqlType>::OutputSqlType;
 
+    const IS_AGGREGATE: bool = true;
+
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -175,6 +194,11 @@ where
         write!(f, ")")?;
         Ok(())
     }
+}
+
+impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlSum<S, E> where
+    E::SqlType: SummableSqlType
+{
 }
 
 pub struct SqlMax<S: SelectableTables, E: SqlExpression<S>>
@@ -204,6 +228,8 @@ where
     type RustType = E::RustType;
     type SqlType = E::SqlType;
 
+    const IS_AGGREGATE: bool = true;
+
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -217,6 +243,11 @@ where
         write!(f, ")")?;
         Ok(())
     }
+}
+
+impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlMax<S, E> where
+    E::SqlType: OrderableSqlType
+{
 }
 
 pub struct SqlMin<S: SelectableTables, E: SqlExpression<S>>
@@ -246,6 +277,8 @@ where
     type RustType = E::RustType;
     type SqlType = E::SqlType;
 
+    const IS_AGGREGATE: bool = true;
+
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -259,4 +292,9 @@ where
         write!(f, ")")?;
         Ok(())
     }
+}
+
+impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlMin<S, E> where
+    E::SqlType: OrderableSqlType
+{
 }

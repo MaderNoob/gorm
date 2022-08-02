@@ -2,12 +2,15 @@ use gorm::{
     execution::DatabaseConnection,
     select_values,
     sql::{
-        AddableSqlExpression, AverageableSqlExpression, OrderableSqlExpression, SqlExpression,
-        SummableSqlExpression, TableMarker,
+        AddableSqlExpression, AverageableSqlExpression, MultipliableSqlExpression,
+        OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker, Migration,
     },
     statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom},
-    Decimal, FromQueryResult, Table,
+    Decimal, FromQueryResult, Table, migration,
 };
+
+struct CreateTablesMigration;
+migration!{CreateTablesMigration => school, pet, person}
 
 #[tokio::main]
 async fn main() {
@@ -15,19 +18,7 @@ async fn main() {
         .await
         .unwrap();
 
-    school::table
-        .create()
-        .if_not_exists()
-        .execute(&client)
-        .await
-        .unwrap();
-
-    person::table
-        .create()
-        .if_not_exists()
-        .execute(&client)
-        .await
-        .unwrap();
+    CreateTablesMigration::up(&client).await.unwrap();
 
     #[derive(Debug, FromQueryResult)]
     struct PersonNameAndSchoolName {
@@ -53,7 +44,10 @@ async fn main() {
 
     let p = person::table
         .find()
-        .select(select_values!(person::age.sum() as avg_age))
+        .select(select_values!(
+            person::age.multiply(person::id).sum() as avg_age
+        ))
+        .group_by(person::school_id.add(person::id))
         .load_all::<PeopleAvgAge>(&client)
         .await
         .unwrap();
@@ -69,6 +63,8 @@ pub struct Person {
 
     #[table(foreign_key = "School")]
     school_id: i32,
+
+    pet_id: Option<i32>,
 }
 
 #[derive(Debug, Table)]

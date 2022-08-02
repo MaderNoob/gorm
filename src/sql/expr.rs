@@ -15,6 +15,8 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
     type SqlType: SqlType;
     type RustType: IntoSqlType<SqlType = Self::SqlType>;
 
+    const IS_AGGREGATE: bool;
+
     /// Writes the sql expression as an sql string which can be evaluated by the
     /// database.
     fn write_sql_string<'s, 'a>(
@@ -59,6 +61,8 @@ where
 {
     type RustType = <C as Column>::RustType;
     type SqlType = <C as Column>::SqlType;
+
+    const IS_AGGREGATE: bool = false;
 
     fn write_sql_string<'s, 'a>(
         &'s self,
@@ -132,6 +136,13 @@ impl<S: SelectableTables, T: SqlExpression<S>> OrderableSqlExpression<S> for T w
 {
 }
 
+/// An sql expression which uses an aggregate function
+pub trait AggregateSqlExpression {}
+
+/// An sql expression which does not contain any aggregate function
+pub auto trait NonAggregateSqlExpression {}
+impl<E: AggregateSqlExpression> !NonAggregateSqlExpression for E {}
+
 pub trait AverageableSqlExpression<S: SelectableTables>: SqlExpression<S>
 where
     Self::SqlType: AverageableSqlType,
@@ -196,6 +207,8 @@ macro_rules! impl_primitive_expression{
                 type SqlType = <$t as IntoSqlType>::SqlType;
                 type RustType = $t;
 
+                const IS_AGGREGATE:bool = false;
+
                 fn write_sql_string<'s, 'a>(
                     &'s self,
                     f: &mut String,
@@ -220,6 +233,8 @@ impl_primitive_expression! {bool, i16, i32, i64, f32, f64}
 impl<'b, S: SelectableTables> SqlExpression<S> for &'b str {
     type RustType = &'b str;
     type SqlType = SqlText;
+
+    const IS_AGGREGATE: bool = false;
 
     fn write_sql_string<'s, 'a>(
         &'s self,
