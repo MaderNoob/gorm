@@ -1,6 +1,9 @@
 use std::fmt::Write;
 
-use super::{SqlAdd, SqlAddition, SqlSubtract, SqlSubtraction, SqlMultiply, SqlMultiplication, SqlDivide, SqlDivision, SqlCount};
+use super::{
+    AverageableSqlType, SqlAdd, SqlAddition, SqlAverage, SqlCount, SqlDivide, SqlDivision, SqlMax,
+    SqlMultiplication, SqlMultiply, SqlSubtract, SqlSubtraction, SqlSum, SummableSqlType,
+};
 use crate::sql::{
     Column, IntoSqlType, OrderableSqlType, ParameterBinder, SelectableTables,
     SelectableTablesContains, SqlConditionEq, SqlConditionGreaterEquals, SqlConditionGreaterThan,
@@ -42,8 +45,9 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
         SqlConditionNotEq::new(self, other)
     }
 
-    /// Returns an expression which evaluates to the amount of items returned from the query.
-    fn count(self) -> SqlCount<S, Self>{
+    /// Returns an expression which evaluates to the amount of items returned
+    /// from the query.
+    fn count(self) -> SqlCount<S, Self> {
         SqlCount::new(self)
     }
 }
@@ -73,7 +77,10 @@ where
     }
 }
 
-pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S> {
+pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S>
+where
+    Self::SqlType: OrderableSqlType,
+{
     /// Returns a condition which will be true if this expression is lower than
     /// the given one.
     // only allow comparing with expression with the same value type
@@ -113,9 +120,45 @@ pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S> {
     ) -> SqlConditionGreaterEquals<S, Self, O> {
         SqlConditionGreaterEquals::new(self, other)
     }
+
+    /// Returns an expression which evaluates to the max item of the items
+    /// returned from the query.
+    fn max(self) -> SqlMax<S, Self> {
+        SqlMax::new(self)
+    }
 }
 impl<S: SelectableTables, T: SqlExpression<S>> OrderableSqlExpression<S> for T where
     T::SqlType: OrderableSqlType
+{
+}
+
+pub trait AverageableSqlExpression<S: SelectableTables>: SqlExpression<S>
+where
+    Self::SqlType: AverageableSqlType,
+{
+    /// Returns an expression which evaluates to the average of the items
+    /// returned from the query.
+    fn average(self) -> SqlAverage<S, Self> {
+        SqlAverage::new(self)
+    }
+}
+impl<S: SelectableTables, E: SqlExpression<S>> AverageableSqlExpression<S> for E where
+    E::SqlType: AverageableSqlType
+{
+}
+
+pub trait SummableSqlExpression<S: SelectableTables>: SqlExpression<S>
+where
+    Self::SqlType: SummableSqlType,
+{
+    /// Returns an expression which evaluates to the sum of the items
+    /// returned from the query.
+    fn sum(self) -> SqlSum<S, Self> {
+        SqlSum::new(self)
+    }
+}
+impl<S: SelectableTables, E: SqlExpression<S>> SummableSqlExpression<S> for E where
+    E::SqlType: SummableSqlType
 {
 }
 
@@ -140,10 +183,10 @@ macro_rules! define_expression_operator_trait {
     };
 }
 
-define_expression_operator_trait!{AddableSqlExpression, SqlAdd, SqlAddition, add}
-define_expression_operator_trait!{SubtractableSqlExpression, SqlSubtract, SqlSubtraction, subtract}
-define_expression_operator_trait!{MultipliableSqlExpression, SqlMultiply, SqlMultiplication, multiply}
-define_expression_operator_trait!{DivisibleSqlExpression, SqlDivide, SqlDivision, divide}
+define_expression_operator_trait! {AddableSqlExpression, SqlAdd, SqlAddition, add}
+define_expression_operator_trait! {SubtractableSqlExpression, SqlSubtract, SqlSubtraction, subtract}
+define_expression_operator_trait! {MultipliableSqlExpression, SqlMultiply, SqlMultiplication, multiply}
+define_expression_operator_trait! {DivisibleSqlExpression, SqlDivide, SqlDivision, divide}
 
 macro_rules! impl_primitive_expression{
     { $($t: ty),+ }=> {

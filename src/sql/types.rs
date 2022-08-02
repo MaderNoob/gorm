@@ -1,12 +1,14 @@
+use rust_decimal::Decimal;
+
 /// An sql type.
 pub trait SqlType {
-    type RustType;
+    type RustType: IntoSqlType<SqlType = Self>;
     const SQL_NAME: &'static str;
 }
 
 /// An sql type.
 pub trait SqlSerialType {
-    type RustType;
+    type RustType: IntoSqlSerialType<SqlSerialType = Self>;
     const SQL_NAME: &'static str;
 }
 
@@ -61,6 +63,7 @@ define_sql_type! { SqlI32, "integer" => i32 }
 define_sql_type! { SqlI64, "bigint" => i64 }
 define_sql_type! { SqlF32, "real" => f32 }
 define_sql_type! { SqlF64, "double precision" => f64 }
+define_sql_type! { SqlNumeric, "numeric" => Decimal }
 define_sql_type! { SqlText, "text" => String }
 define_sql_type! { serial Serial16, "smallserial" => i16  }
 define_sql_type! { serial Serial32, "serial" => i32 }
@@ -80,7 +83,49 @@ macro_rules! mark_sql_types {
     };
 }
 
-mark_sql_types!{OrderableSqlType => SqlI16, SqlI32, SqlI64, SqlF32, SqlF64, Serial16, Serial32, Serial64, SqlText}
+mark_sql_types!{OrderableSqlType => SqlI16, SqlI32, SqlI64, SqlF32, SqlF64, SqlNumeric, Serial16, Serial32, Serial64, SqlText}
+
+pub trait AverageableSqlType {
+    type OutputSqlType: SqlType;
+}
+
+pub trait SummableSqlType: SqlAdd<Self> + Sized {
+    type OutputSqlType: SqlType;
+}
+
+macro_rules! mark_sql_types_with_output_type {
+    {$marker_trait: ty => $($t:ty : $output_ty:ty),*} => {
+        $(
+            impl $marker_trait for $t {
+                type OutputSqlType = $output_ty;
+            }
+        )*
+    };
+}
+
+mark_sql_types_with_output_type!{AverageableSqlType => 
+    SqlI16: SqlNumeric, 
+    SqlI32: SqlNumeric, 
+    SqlI64: SqlNumeric, 
+    SqlF32: SqlF64, 
+    SqlF64: SqlF64, 
+    SqlNumeric: SqlNumeric, 
+    Serial16: SqlNumeric,
+    Serial32: SqlNumeric,
+    Serial64: SqlNumeric
+}
+
+mark_sql_types_with_output_type!{SummableSqlType => 
+    SqlI16: SqlI64, 
+    SqlI32: SqlI64, 
+    SqlI64: SqlNumeric, 
+    SqlF32: SqlF32, 
+    SqlF64: SqlF64, 
+    SqlNumeric: SqlNumeric, 
+    Serial16: SqlI64,
+    Serial32: SqlI64,
+    Serial64: SqlNumeric
+}
 
 
 macro_rules! mark_sql_types_with_rhs {
@@ -106,6 +151,7 @@ macro_rules! mark_all_number_types_with_rhs {
             SqlI64: (SqlI64, Serial64),
             SqlF32: (SqlF32),
             SqlF64: (SqlF64),
+            SqlNumeric: (SqlNumeric),
             Serial16: (Serial16, SqlI16),
             Serial32: (Serial32, SqlI32),
             Serial64: (Serial64, SqlI64)

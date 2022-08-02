@@ -3,10 +3,10 @@ use gorm::{
     select_values,
     sql::{
         AddableSqlExpression, AverageableSqlExpression, OrderableSqlExpression, SqlExpression,
-        TableMarker,
+        SummableSqlExpression, TableMarker,
     },
     statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom},
-    FromQueryResult, Table, Decimal,
+    Decimal, FromQueryResult, Table,
 };
 
 #[tokio::main]
@@ -48,12 +48,12 @@ async fn main() {
 
     #[derive(Debug, FromQueryResult)]
     struct PeopleAvgAge {
-        avg_age: Decimal,
+        avg_age: i64,
     }
 
     let p = person::table
         .find()
-        .select(select_values!(person::age.average() as avg_age))
+        .select(select_values!(person::age.sum() as avg_age))
         .load_all::<PeopleAvgAge>(&client)
         .await
         .unwrap();

@@ -13,4 +13,5 @@ pub use gorm_macros::{select_values, FromQueryResult, Table};
 pub use paste;
 pub use sql::{FromQueryResult, Table};
 pub use tokio_postgres;
+pub use rust_decimal::Decimal;
 pub use util::*;
