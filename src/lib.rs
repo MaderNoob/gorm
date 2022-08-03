@@ -16,3 +16,4 @@ pub use rust_decimal::Decimal;
 pub use sql::{FromQueryResult, Table};
 pub use tokio_postgres;
 pub use util::*;
+pub use futures;

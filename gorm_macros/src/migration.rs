@@ -9,12 +9,20 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
         table_names,
     } = migration_input;
 
+    let map_result_to_unit_type_fn_definition = quote!{
+        fn map_result_to_unit_type(result: ::gorm::Result<::gorm::execution::ExecuteResult>)->::gorm::Result<()>{
+            result.map(|_| ())
+        }
+    };
+
+    let map_result_to_unit_type_fn_definition_ref = &map_result_to_unit_type_fn_definition;
+
     let create_tables = table_names.iter().map(|table_name| {
         quote! {
             #table_name::table
                 .create()
                 .execute(executor)
-                .await?;
+                .map(map_result_to_unit_type)
         }
     });
 
@@ -27,7 +35,7 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
                 .drop()
                 .if_exists()
                 .execute(executor)
-                .await?;
+                .map(map_result_to_unit_type)
         }
     });
 
@@ -35,12 +43,24 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
         #[::gorm::async_trait]
         impl ::gorm::sql::Migration for #struct_name{
             async fn up<E: ::gorm::execution::SqlStatementExecutor + ::std::marker::Send + std::marker::Sync>(executor: &E) -> ::gorm::Result<()>{
-                #(#create_tables)*
+                use ::gorm::futures::future::FutureExt;
+
+                #map_result_to_unit_type_fn_definition_ref
+
+                ::gorm::futures::future::try_join_all([
+                    #(#create_tables),*
+                ]).await?;
                 Ok(())
             }
 
             async fn down<E: ::gorm::execution::SqlStatementExecutor + ::std::marker::Send + std::marker::Sync>(executor: &E) -> ::gorm::Result<()>{
-                #(#drop_tables)*
+                use ::gorm::futures::future::FutureExt;
+
+                #map_result_to_unit_type_fn_definition_ref
+
+                ::gorm::futures::future::try_join_all([
+                    #(#drop_tables),*
+                ]).await?;
                 Ok(())
             }
         }
