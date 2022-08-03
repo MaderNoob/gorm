@@ -1,11 +1,13 @@
 mod create_table;
 mod drop_table;
 mod select;
+mod insert;
 
 use async_trait::async_trait;
 pub use create_table::*;
 pub use drop_table::*;
 pub use select::*;
+pub use insert::*;
 
 use crate::{
     error::*,

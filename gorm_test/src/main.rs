@@ -1,16 +1,17 @@
 use gorm::{
     execution::DatabaseConnection,
-    select_values,
+    migration, select_values,
     sql::{
-        AddableSqlExpression, AverageableSqlExpression, MultipliableSqlExpression,
-        OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker, Migration,
+        AddableSqlExpression, AverageableSqlExpression, Insertable, Migration,
+        MultipliableSqlExpression, OrderableSqlExpression, SqlExpression, SummableSqlExpression,
+        TableMarker,
     },
     statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom},
-    Decimal, FromQueryResult, Table, migration,
+    Decimal, FromQueryResult, Table,
 };
 
 struct CreateTablesMigration;
-migration!{CreateTablesMigration => school, pet, person}
+migration! {CreateTablesMigration => school, pet, person}
 
 #[tokio::main]
 async fn main() {
@@ -19,6 +20,16 @@ async fn main() {
         .unwrap();
 
     CreateTablesMigration::up(&client).await.unwrap();
+
+    person::new {
+        name: "James".to_string(),
+        age: 16,
+        school_id: 1,
+        pet_id: None,
+    }
+    .insert(&client)
+    .await
+    .unwrap();
 
     #[derive(Debug, FromQueryResult)]
     struct PersonNameAndSchoolName {
