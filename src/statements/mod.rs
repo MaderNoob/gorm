@@ -1,20 +1,21 @@
 mod create_table;
-mod drop_table;
-mod select;
-mod insert;
 mod delete;
+mod drop_table;
+mod insert;
+mod select;
 
 use async_trait::async_trait;
 pub use create_table::*;
-pub use drop_table::*;
-pub use select::*;
-pub use insert::*;
 pub use delete::*;
+pub use drop_table::*;
+pub use insert::*;
+pub use select::*;
 
 use crate::{
     error::*,
     execution::{ExecuteResult, SqlStatementExecutor},
     sql::{FieldsConsListItem, FromQueryResult, ParameterBinder},
+    TypedConsListNil, TypesNotEqual,
 };
 
 /// An sql statement which can be executed by a database.
@@ -51,7 +52,16 @@ pub trait ExecuteSqlStatment: SqlStatement {
     ) -> Result<ExecuteResult> {
         on.execute(self).await
     }
+}
 
+#[async_trait]
+impl<S: SqlStatement> ExecuteSqlStatment for S {}
+
+#[async_trait]
+pub trait LoadSqlStatment: SqlStatement
+where
+    (Self::OutputFields, TypedConsListNil): TypesNotEqual,
+{
     async fn load_one<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
         self,
         on: &(impl SqlStatementExecutor + Send + Sync),
@@ -75,4 +85,4 @@ pub trait ExecuteSqlStatment: SqlStatement {
 }
 
 #[async_trait]
-impl<S: SqlStatement> ExecuteSqlStatment for S {}
+impl<S: SqlStatement> LoadSqlStatment for S where (S::OutputFields, TypedConsListNil): TypesNotEqual {}

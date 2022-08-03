@@ -6,7 +6,7 @@ use gorm::{
         MultipliableSqlExpression, OrderableSqlExpression, SqlExpression, SummableSqlExpression,
         TableMarker,
     },
-    statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom},
+    statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom, LoadSqlStatment},
     Decimal, FromQueryResult, Table,
 };
 
