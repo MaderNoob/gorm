@@ -24,7 +24,10 @@ async fn main() {
 
     school::new {
         name: "mekif".to_string(),
-    }.insert(&client).await.unwrap();
+    }
+    .insert(&client)
+    .await
+    .unwrap();
 
     person::new {
         name: "James".to_string(),

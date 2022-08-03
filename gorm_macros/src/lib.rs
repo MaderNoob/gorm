@@ -1,8 +1,8 @@
 mod from_query_result;
+mod migration;
 mod select_values;
 mod table;
 mod util;
-mod migration;
 
 use proc_macro::TokenStream;
 use util::generate_field_name_cons_list_type;
