@@ -8,3 +8,16 @@ impl<T> !TypesNotEqual for (T, T) {}
 pub struct TypedConsListNil;
 impl FieldsConsListItem for TypedConsListNil {}
 impl FieldNameCharsConsListItem for TypedConsListNil {}
+
+pub struct TypedFalse;
+pub struct TypedTrue;
+
+pub trait TypedBool{
+    const VALUE:bool;
+}
+impl TypedBool for TypedFalse{
+    const VALUE:bool = false;
+}
+impl TypedBool for TypedTrue{
+    const VALUE:bool = true;
+}

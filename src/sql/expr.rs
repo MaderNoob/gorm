@@ -153,13 +153,6 @@ impl<S: SelectableTables, T: SqlExpression<S>> OrderableSqlExpression<S> for T w
 {
 }
 
-/// An sql expression which uses an aggregate function
-pub trait AggregateSqlExpression {}
-
-/// An sql expression which does not contain any aggregate function
-pub auto trait NonAggregateSqlExpression {}
-impl<E: AggregateSqlExpression> !NonAggregateSqlExpression for E {}
-
 pub trait AverageableSqlExpression<S: SelectableTables>: SqlExpression<S>
 where
     Self::SqlType: AverageableSqlType,

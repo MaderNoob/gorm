@@ -3,8 +3,8 @@ use std::{fmt::Write, marker::PhantomData};
 use rust_decimal::Decimal;
 
 use crate::sql::{
-    AggregateSqlExpression, AverageableSqlType, OrderableSqlType, ParameterBinder,
-    SelectableTables, SqlExpression, SqlI64, SqlNumeric, SqlType, SummableSqlType,
+    AverageableSqlType, OrderableSqlType, ParameterBinder, SelectableTables, SqlExpression, SqlI64,
+    SqlNumeric, SqlType, SummableSqlType,
 };
 
 pub struct SqlCount<S: SelectableTables, E: SqlExpression<S>> {
@@ -41,8 +41,6 @@ impl<S: SelectableTables, E: SqlExpression<S>> SqlExpression<S> for SqlCount<S, 
         Ok(())
     }
 }
-
-impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlCount<S, E> {}
 
 pub struct SqlAverage<S: SelectableTables, E: SqlExpression<S>>
 where
@@ -86,11 +84,6 @@ where
         write!(f, ")")?;
         Ok(())
     }
-}
-
-impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlAverage<S, E> where
-    E::SqlType: AverageableSqlType
-{
 }
 
 pub struct SqlSum<S: SelectableTables, E: SqlExpression<S>>
@@ -137,11 +130,6 @@ where
     }
 }
 
-impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlSum<S, E> where
-    E::SqlType: SummableSqlType
-{
-}
-
 pub struct SqlMax<S: SelectableTables, E: SqlExpression<S>>
 where
     E::SqlType: OrderableSqlType,
@@ -184,11 +172,6 @@ where
         write!(f, ")")?;
         Ok(())
     }
-}
-
-impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlMax<S, E> where
-    E::SqlType: OrderableSqlType
-{
 }
 
 pub struct SqlMin<S: SelectableTables, E: SqlExpression<S>>
@@ -235,7 +218,3 @@ where
     }
 }
 
-impl<S: SelectableTables, E: SqlExpression<S>> AggregateSqlExpression for SqlMin<S, E> where
-    E::SqlType: OrderableSqlType
-{
-}

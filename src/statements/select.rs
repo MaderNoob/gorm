@@ -1,42 +1,83 @@
 use std::{fmt::Write, marker::PhantomData};
 
 use super::SqlStatement;
-use crate::sql::{
-    Column, CombineSelectableTables, CombinedSelectableTables, HasForeignKey, ParameterBinder,
-    SelectableTables, SelectedValues, SqlCondition, SqlExpression, Table, TableMarker,
+use crate::{
+    sql::{
+        Column, CombineSelectableTables, CombinedSelectableTables, FieldsConsListItem,
+        HasForeignKey, ParameterBinder, SelectableTables, SelectedValues, SqlCondition,
+        SqlExpression, Table, TableMarker,
+    },
+    TypedBool, TypedFalse, TypedTrue,
 };
 
+pub trait SelectStatement: SqlStatement {
+    type OutputFields: FieldsConsListItem;
+    type SelectFrom: SelectFrom;
+
+    type HasSelectedValues: TypedBool;
+    type HasWhereClause: TypedBool;
+    type HasGroupByClause: TypedBool;
+
+    fn write_selected_values<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a;
+
+    fn write_where_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a;
+
+    fn write_group_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a;
+}
+
+impl<T: SelectStatement> SqlStatement for T {
+    type OutputFields = <Self as SelectStatement>::OutputFields;
+
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "SELECT ")?;
+        self.write_selected_values(f, parameter_binder)?;
+        write!(f, " FROM ")?;
+        <Self as SelectStatement>::SelectFrom::write_sql_from_string(f)?;
+        self.write_where_clause(f, parameter_binder)?;
+        self.write_group_by_clause(f, parameter_binder)
+    }
+}
+
 /// An sql statement for finding records in a table
-pub struct SelectStatement<S: SelectFrom>(PhantomData<S>);
-impl<S: SelectFrom> SelectStatement<S> {
+pub struct EmptySelectStatement<S: SelectFrom>(PhantomData<S>);
+impl<S: SelectFrom> EmptySelectStatement<S> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
-
-    pub fn select<V: SelectedValues<S::SelectableTables>>(
-        self,
-        selected_values: V,
-    ) -> SelectStatementCustomValues<S, V> {
-        SelectStatementCustomValues {
-            values: selected_values,
-            phantom: PhantomData,
-        }
-    }
-
-    pub fn filter<C: SqlCondition<<S as SelectFrom>::SelectableTables>>(
-        self,
-        condition: C,
-    ) -> FilteredSelectStatement<S, C> {
-        FilteredSelectStatement {
-            condition,
-            phantom: PhantomData,
-        }
-    }
 }
-impl<S: SelectFrom + 'static> SqlStatement for SelectStatement<S> {
+impl<S: SelectFrom + 'static> SelectStatement for EmptySelectStatement<S> {
+    type HasGroupByClause = TypedFalse;
+    type HasSelectedValues = TypedFalse;
+    type HasWhereClause = TypedFalse;
     type OutputFields = <S::LeftMostTable as Table>::Fields;
+    type SelectFrom = S;
 
-    fn write_sql_string<'s, 'a>(
+    fn write_selected_values<'s, 'a>(
         &'s self,
         f: &mut String,
         _parameter_binder: &mut ParameterBinder<'a>,
@@ -44,86 +85,54 @@ impl<S: SelectFrom + 'static> SqlStatement for SelectStatement<S> {
     where
         's: 'a,
     {
-        write!(f, "SELECT * FROM ")?;
-        S::write_sql_from_string(f)?;
-        Ok(())
+        write!(f, "*")
     }
-}
 
-/// An sql statement for finding records in a table which selects custom values
-pub struct SelectStatementCustomValues<S: SelectFrom, V: SelectedValues<S::SelectableTables>> {
-    values: V,
-    phantom: PhantomData<S>,
-}
-
-impl<S: SelectFrom, V: SelectedValues<S::SelectableTables>> SelectStatementCustomValues<S, V> {
-    pub fn filter<C: SqlCondition<<S as SelectFrom>::SelectableTables>>(
-        self,
-        condition: C,
-    ) -> FilteredSelectStatementCustomValues<S, V, C> {
-        FilteredSelectStatementCustomValues {
-            condition,
-            values: self.values,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<S: SelectFrom, V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true>>
-    SelectStatementCustomValues<S, V>
-{
-    pub fn group_by<G: SqlExpression<S::SelectableTables>>(
-        self,
-        group_by: G,
-    ) -> SelectStatementCustomValuesGroupedBy<S, V, G> {
-        SelectStatementCustomValuesGroupedBy {
-            group_by,
-            values: self.values,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<S: SelectFrom + 'static, V: SelectedValues<S::SelectableTables> + 'static> SqlStatement
-    for SelectStatementCustomValues<S, V>
-{
-    type OutputFields = V::Fields;
-
-    fn write_sql_string<'s, 'a>(
+    fn write_where_clause<'s, 'a>(
         &'s self,
-        f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
+        _f: &mut String,
+        _parameter_binder: &mut ParameterBinder<'a>,
     ) -> std::fmt::Result
     where
         's: 'a,
     {
-        write!(f, "SELECT ")?;
-        self.values.write_sql_string(f, parameter_binder)?;
-        write!(f, " FROM ")?;
-        S::write_sql_from_string(f)?;
+        Ok(())
+    }
+
+    fn write_group_by_clause<'s, 'a>(
+        &'s self,
+        _f: &mut String,
+        _parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
         Ok(())
     }
 }
 
-pub struct SelectStatementCustomValuesGroupedBy<
+pub struct WithSelectedValues<
     S: SelectFrom,
-    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true>,
-    G: SqlExpression<S::SelectableTables>,
+    T: SelectStatement<HasSelectedValues = TypedFalse>,
+    V: SelectedValues<S::SelectableTables>,
 > {
+    statement: T,
     values: V,
-    group_by: G,
     phantom: PhantomData<S>,
 }
-
 impl<
     S: SelectFrom + 'static,
-    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true> + 'static,
-    G: SqlExpression<S::SelectableTables> + 'static,
-> SqlStatement for SelectStatementCustomValuesGroupedBy<S, V, G>
+    T: SelectStatement<HasSelectedValues = TypedFalse>,
+    V: SelectedValues<S::SelectableTables> + 'static,
+> SelectStatement for WithSelectedValues<S, T, V>
 {
+    type HasGroupByClause = T::HasGroupByClause;
+    type HasSelectedValues = TypedTrue;
+    type HasWhereClause = T::HasWhereClause;
     type OutputFields = V::Fields;
+    type SelectFrom = S;
 
-    fn write_sql_string<'s, 'a>(
+    fn write_selected_values<'s, 'a>(
         &'s self,
         f: &mut String,
         parameter_binder: &mut ParameterBinder<'a>,
@@ -131,46 +140,68 @@ impl<
     where
         's: 'a,
     {
-        write!(f, "SELECT ")?;
-        self.values.write_sql_string(f, parameter_binder)?;
-        write!(f, " FROM ")?;
-        S::write_sql_from_string(f)?;
-        write!(f, " GROUP BY ")?;
-        self.group_by.write_sql_string(f, parameter_binder)?;
-        Ok(())
+        self.values.write_sql_string(f, parameter_binder)
+    }
+
+    fn write_where_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_where_clause(f, parameter_binder)
+    }
+
+    fn write_group_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_group_by_clause(f, parameter_binder)
     }
 }
 
-/// An sql statement for finding records in a table matching some condition
-pub struct FilteredSelectStatement<
+pub trait SelectValues: SelectStatement<HasSelectedValues = TypedFalse> {
+    fn select<V: SelectedValues<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
+        self,
+        values: V,
+    ) -> WithSelectedValues<Self::SelectFrom, Self, V> {
+        WithSelectedValues {
+            statement: self,
+            values,
+            phantom: PhantomData,
+        }
+    }
+}
+impl<T: SelectStatement<HasSelectedValues = TypedFalse>> SelectValues for T {}
+
+pub struct WithWhereClause<
     S: SelectFrom,
-    C: SqlCondition<<S as SelectFrom>::SelectableTables>,
+    T: SelectStatement<HasWhereClause = TypedFalse>,
+    C: SqlCondition<S::SelectableTables>,
 > {
+    statement: T,
     condition: C,
     phantom: PhantomData<S>,
 }
-
-impl<S: SelectFrom, C: SqlCondition<<S as SelectFrom>::SelectableTables>>
-    FilteredSelectStatement<S, C>
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasWhereClause = TypedFalse>,
+    C: SqlCondition<S::SelectableTables> + 'static,
+> SelectStatement for WithWhereClause<S, T, C>
 {
-    pub fn select<V: SelectedValues<S::SelectableTables>>(
-        self,
-        selected_values: V,
-    ) -> FilteredSelectStatementCustomValues<S, V, C> {
-        FilteredSelectStatementCustomValues {
-            values: selected_values,
-            condition: self.condition,
-            phantom: PhantomData,
-        }
-    }
-}
+    type HasGroupByClause = T::HasGroupByClause;
+    type HasSelectedValues = T::HasSelectedValues;
+    type HasWhereClause = TypedTrue;
+    type OutputFields = <T as SelectStatement>::OutputFields;
+    type SelectFrom = S;
 
-impl<S: SelectFrom + 'static, C: SqlCondition<S::SelectableTables> + 'static> SqlStatement
-    for FilteredSelectStatement<S, C>
-{
-    type OutputFields = <S::LeftMostTable as Table>::Fields;
-
-    fn write_sql_string<'s, 'a>(
+    fn write_where_clause<'s, 'a>(
         &'s self,
         f: &mut String,
         parameter_binder: &mut ParameterBinder<'a>,
@@ -178,110 +209,116 @@ impl<S: SelectFrom + 'static, C: SqlCondition<S::SelectableTables> + 'static> Sq
     where
         's: 'a,
     {
-        write!(f, "SELECT * FROM ")?;
-        S::write_sql_from_string(f)?;
         write!(f, " WHERE ")?;
         self.condition.write_sql_string(f, parameter_binder)
     }
+
+    fn write_selected_values<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_selected_values(f, parameter_binder)
+    }
+
+    fn write_group_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_group_by_clause(f, parameter_binder)
+    }
 }
 
-/// An sql statement for finding records in a table matching some condition
-/// which selects custom values.
-pub struct FilteredSelectStatementCustomValues<
+pub trait Filter: SelectStatement<HasWhereClause = TypedFalse> {
+    fn filter<C: SqlCondition<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
+        self,
+        condition: C,
+    ) -> WithWhereClause<Self::SelectFrom, Self, C> {
+        WithWhereClause {
+            statement: self,
+            condition,
+            phantom: PhantomData,
+        }
+    }
+}
+impl<T: SelectStatement<HasWhereClause = TypedFalse>> Filter for T {}
+
+pub struct WithGroupByClause<
     S: SelectFrom,
-    V: SelectedValues<S::SelectableTables>,
-    C: SqlCondition<<S as SelectFrom>::SelectableTables>,
+    T: SelectStatement<HasGroupByClause = TypedFalse>,
+    G: SqlExpression<S::SelectableTables>,
 > {
-    condition: C,
-    values: V,
+    statement: T,
+    group_by: G,
     phantom: PhantomData<S>,
 }
-
 impl<
     S: SelectFrom + 'static,
-    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true> + 'static,
-    C: SqlCondition<<S as SelectFrom>::SelectableTables> + 'static,
-> FilteredSelectStatementCustomValues<S, V, C>
+    T: SelectStatement<HasGroupByClause = TypedFalse>,
+    G: SqlExpression<S::SelectableTables> + 'static,
+> SelectStatement for WithGroupByClause<S, T, G>
 {
-    pub fn group_by<G: SqlExpression<S::SelectableTables>>(
+    type HasGroupByClause = TypedTrue;
+    type HasSelectedValues = T::HasSelectedValues;
+    type HasWhereClause = T::HasWhereClause;
+    type OutputFields = <T as SelectStatement>::OutputFields;
+    type SelectFrom = S;
+
+    fn write_group_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, " GROUP BY ")?;
+        self.group_by.write_sql_string(f, parameter_binder)
+    }
+
+    fn write_selected_values<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_selected_values(f, parameter_binder)
+    }
+
+    fn write_where_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_where_clause(f, parameter_binder)
+    }
+}
+
+pub trait GroupBy: SelectStatement<HasGroupByClause = TypedFalse> {
+    fn group_by<G: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
         self,
         group_by: G,
-    ) -> FilteredSelectStatementCustomValuesGroupedBy<S, V, C, G> {
-        FilteredSelectStatementCustomValuesGroupedBy {
-            condition: self.condition,
-            values: self.values,
+    ) -> WithGroupByClause<Self::SelectFrom, Self, G> {
+        WithGroupByClause {
+            statement: self,
             group_by,
             phantom: PhantomData,
         }
     }
 }
-
-impl<
-    S: SelectFrom + 'static,
-    V: SelectedValues<S::SelectableTables> + 'static,
-    C: SqlCondition<<S as SelectFrom>::SelectableTables> + 'static,
-> SqlStatement for FilteredSelectStatementCustomValues<S, V, C>
-{
-    type OutputFields = V::Fields;
-
-    fn write_sql_string<'s, 'a>(
-        &'s self,
-        f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
-    ) -> std::fmt::Result
-    where
-        's: 'a,
-    {
-        write!(f, "SELECT ")?;
-        self.values.write_sql_string(f, parameter_binder)?;
-        write!(f, " FROM ")?;
-        S::write_sql_from_string(f)?;
-        write!(f, " WHERE ")?;
-        self.condition.write_sql_string(f, parameter_binder)?;
-        Ok(())
-    }
-}
-
-pub struct FilteredSelectStatementCustomValuesGroupedBy<
-    S: SelectFrom,
-    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true>,
-    C: SqlCondition<<S as SelectFrom>::SelectableTables>,
-    G: SqlExpression<S::SelectableTables>,
-> {
-    condition: C,
-    values: V,
-    group_by: G,
-    phantom: PhantomData<S>,
-}
-
-impl<
-    S: SelectFrom + 'static,
-    V: SelectedValues<S::SelectableTables, IS_AGGREGATE = true> + 'static,
-    C: SqlCondition<<S as SelectFrom>::SelectableTables> + 'static,
-    G: SqlExpression<S::SelectableTables> + 'static,
-> SqlStatement for FilteredSelectStatementCustomValuesGroupedBy<S, V, C, G>
-{
-    type OutputFields = V::Fields;
-
-    fn write_sql_string<'s, 'a>(
-        &'s self,
-        f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
-    ) -> std::fmt::Result
-    where
-        's: 'a,
-    {
-        write!(f, "SELECT ")?;
-        self.values.write_sql_string(f, parameter_binder)?;
-        write!(f, " FROM ")?;
-        S::write_sql_from_string(f)?;
-        write!(f, " WHERE ")?;
-        self.condition.write_sql_string(f, parameter_binder)?;
-        write!(f, " GROUP BY ")?;
-        self.group_by.write_sql_string(f, parameter_binder)?;
-        Ok(())
-    }
-}
+impl<T: SelectStatement<HasGroupByClause = TypedFalse>> GroupBy for T {}
 
 /// Something which you can select from.
 /// This can be a table or multiple joined tables.
@@ -300,8 +337,8 @@ pub trait SelectFrom: Sized {
     fn write_sql_from_string_without_left(f: &mut String) -> std::fmt::Result;
 
     /// Creates a select statement which finds records in this source.
-    fn find(self) -> SelectStatement<Self> {
-        SelectStatement::new()
+    fn find(self) -> EmptySelectStatement<Self> {
+        EmptySelectStatement::new()
     }
 }
 

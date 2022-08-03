@@ -1,3 +1,5 @@
+#![feature(associated_const_equality)]
+
 use gorm::{
     execution::DatabaseConnection,
     migration, select_values,
@@ -6,7 +8,9 @@ use gorm::{
         BooleanOrableSqlExpression, Insertable, Migration, MultipliableSqlExpression,
         OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
-    statements::{ExecuteSqlStatment, InnerJoinTrait, LoadSqlStatment, SelectFrom},
+    statements::{
+        ExecuteSqlStatment, Filter, InnerJoinTrait, LoadSqlStatment, SelectFrom, SelectValues, WithWhereClause, SelectStatement, GroupBy,
+    },
     Decimal, FromQueryResult, Table,
 };
 
@@ -70,6 +74,7 @@ async fn main() {
         .select(select_values!(
             person::age.multiply(person::id).sum() as avg_age
         ))
+        .filter(person::age.greater_than(0))
         .group_by(person::school_id.add(person::id))
         .load_all::<PeopleAvgAge>(&client)
         .await
