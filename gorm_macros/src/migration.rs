@@ -13,13 +13,15 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
         quote! {
             #table_name::table
                 .create()
-                .if_not_exists()
                 .execute(executor)
                 .await?;
         }
     });
 
-    let drop_tables = table_names.iter().map(|table_name| {
+    // note that we must reverse the order here because we must first remove the tables that depend
+    // on others, unlike when creating the tables where we must create the tables that depend on
+    // others last.
+    let drop_tables = table_names.iter().rev().map(|table_name| {
         quote! {
             #table_name::table
                 .drop()

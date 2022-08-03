@@ -19,7 +19,12 @@ async fn main() {
         .await
         .unwrap();
 
+    CreateTablesMigration::down(&client).await.unwrap();
     CreateTablesMigration::up(&client).await.unwrap();
+
+    school::new {
+        name: "mekif".to_string(),
+    }.insert(&client).await.unwrap();
 
     person::new {
         name: "James".to_string(),
