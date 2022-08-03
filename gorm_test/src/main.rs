@@ -2,11 +2,11 @@ use gorm::{
     execution::DatabaseConnection,
     migration, select_values,
     sql::{
-        AddableSqlExpression, AverageableSqlExpression, Insertable, Migration,
-        MultipliableSqlExpression, OrderableSqlExpression, SqlExpression, SummableSqlExpression,
-        TableMarker,
+        AddableSqlExpression, AverageableSqlExpression, BooleanAndableSqlExpression,
+        BooleanOrableSqlExpression, Insertable, Migration, MultipliableSqlExpression,
+        OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
-    statements::{ExecuteSqlStatment, InnerJoinTrait, SelectFrom, LoadSqlStatment},
+    statements::{ExecuteSqlStatment, InnerJoinTrait, LoadSqlStatment, SelectFrom},
     Decimal, FromQueryResult, Table,
 };
 
@@ -48,7 +48,11 @@ async fn main() {
     let p = person::table
         .inner_join(school::table)
         .find()
-        .filter(school::id.greater_equals(1))
+        .filter(
+            school::id
+                .greater_equals(1)
+                .or(school::name.equals("mekif").and(school::id.greater_than(2))),
+        )
         .select(select_values!(person::name, school::name as school_name))
         .load_all::<PersonNameAndSchoolName>(&client)
         .await

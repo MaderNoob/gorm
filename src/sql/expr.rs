@@ -6,8 +6,9 @@ use super::{
 };
 use crate::sql::{
     Column, IntoSqlType, OrderableSqlType, ParameterBinder, SelectableTables,
-    SelectableTablesContains, SqlConditionEq, SqlConditionGreaterEquals, SqlConditionGreaterThan,
-    SqlConditionLowerEquals, SqlConditionLowerThan, SqlConditionNotEq, SqlText, SqlType, Table,
+    SelectableTablesContains, SqlBool, SqlBooleanAnd, SqlBooleanOr, SqlConditionEq,
+    SqlConditionGreaterEquals, SqlConditionGreaterThan, SqlConditionLowerEquals,
+    SqlConditionLowerThan, SqlConditionNotEq, SqlText, SqlType, Table,
 };
 
 /// An sql expression
@@ -26,6 +27,22 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
     ) -> std::fmt::Result
     where
         's: 'a;
+
+    /// Writes the sql expression as an sql string surrounded by parentheses.
+    fn write_parenthesized_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "(")?;
+        self.write_sql_string(f, parameter_binder)?;
+        write!(f, ")")?;
+
+        Ok(())
+    }
 
     /// Returns a condition which will be true if the given expression is equal
     /// to this one.
@@ -198,6 +215,26 @@ define_expression_operator_trait! {AddableSqlExpression, SqlAdd, SqlAddition, ad
 define_expression_operator_trait! {SubtractableSqlExpression, SqlSubtract, SqlSubtraction, subtract}
 define_expression_operator_trait! {MultipliableSqlExpression, SqlMultiply, SqlMultiplication, multiply}
 define_expression_operator_trait! {DivisibleSqlExpression, SqlDivide, SqlDivision, divide}
+
+macro_rules! define_boolean_expression_operator_trait {
+    {$trait_name: ident, $expr_type: ident, $fn_name: ident} => {
+        pub trait $trait_name<S: SelectableTables, Rhs: SqlExpression<S, SqlType = SqlBool>>:
+            SqlExpression<S, SqlType = SqlBool>
+        {
+            fn $fn_name(self, other: Rhs) -> $expr_type<S, Self, Rhs> {
+                $expr_type::new(self, other)
+            }
+        }
+
+        impl<S: SelectableTables, Lhs: SqlExpression<S, SqlType = SqlBool>, Rhs: SqlExpression<S, SqlType = SqlBool>> $trait_name<S, Rhs>
+            for Lhs
+        {
+        }
+    };
+}
+
+define_boolean_expression_operator_trait! {BooleanAndableSqlExpression, SqlBooleanAnd, and}
+define_boolean_expression_operator_trait! {BooleanOrableSqlExpression, SqlBooleanOr, or}
 
 macro_rules! impl_primitive_expression{
     { $($t: ty),+ }=> {
