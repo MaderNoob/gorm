@@ -9,9 +9,9 @@ use gorm::{
         OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
     statements::{
-        ExecuteSqlStatment, Filter, InnerJoinTrait, LoadSqlStatment, SelectFrom, SelectValues, WithWhereClause, SelectStatement, GroupBy, OrderBy,
+        ExecuteSqlStatment, Filter, InnerJoinTrait, LoadSqlStatment, SelectFrom, SelectValues, WithWhereClause, SelectStatement, GroupBy, OrderBy, OrderBySelectedValue,
     },
-    Decimal, FromQueryResult, Table,
+    Decimal, FromQueryResult, Table, selected_value_to_order_by,
 };
 
 struct CreateTablesMigration;
@@ -87,6 +87,7 @@ async fn main() {
         ))
         .filter(person::age.greater_than(0))
         .group_by(person::school_id.add(person::id))
+        .order_by_selected_value_descending(selected_value_to_order_by!(avg_age))
         .load_all::<PeopleAvgAge>(&client)
         .await
         .unwrap();

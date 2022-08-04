@@ -3,9 +3,9 @@ use std::{fmt::Write, marker::PhantomData};
 use super::SqlStatement;
 use crate::{
     sql::{
-        Column, CombineSelectableTables, CombinedSelectableTables, FieldsConsListItem,
-        HasForeignKey, ParameterBinder, SelectableTables, SelectedValues, SqlCondition,
-        SqlExpression, Table, TableMarker,
+        Column, CombineSelectableTables, CombinedSelectableTables, FieldNameCharsConsListItem,
+        FieldsConsListItem, HasForeignKey, ParameterBinder, SelectableTables, SelectedValues,
+        SelectedValuesContainsFieldWithName, SqlCondition, SqlExpression, Table, TableMarker,
     },
     TypedBool, TypedFalse, TypedTrue,
 };
@@ -13,6 +13,24 @@ use crate::{
 pub trait SelectStatement: SqlStatement {
     type OutputFields: FieldsConsListItem;
     type SelectFrom: SelectFrom;
+
+    /// This is used for allowing ordering by a value that was selected using
+    /// `select_values!`. In order to check that the value is actually in
+    /// the list of selected values we need a reference to the
+    /// `SelectedValues` because it implements the
+    /// `SelectedValuesContainsFieldWithName` trait which allows checking if it
+    /// contains a field with a given name.
+    ///
+    /// We can't put a constraint on this type to implement `SelectedValues`
+    /// because that would require adding a generic to the `SelectStatement`
+    /// trait, which will break some other stuff. Also, there won't be an
+    /// easy placeholder to use if we constrained it.
+    ///
+    /// So we just don't constrain it, and for types that don't have custom
+    /// values it will be `()` or whatever else, and for types that have
+    /// custom values it would implement `SelectedValues`, that way we could
+    /// implement something only when this implements `SelectedValues`.
+    type SelectedValues;
 
     type HasSelectedValues: TypedBool;
     type HasWhereClause: TypedBool;
@@ -87,6 +105,7 @@ impl<S: SelectFrom + 'static> SelectStatement for EmptySelectStatement<S> {
     type HasWhereClause = TypedFalse;
     type OutputFields = <S::LeftMostTable as Table>::Fields;
     type SelectFrom = S;
+    type SelectedValues = ();
 
     fn write_selected_values<'s, 'a>(
         &'s self,
@@ -154,6 +173,7 @@ impl<
     type HasWhereClause = T::HasWhereClause;
     type OutputFields = V::Fields;
     type SelectFrom = S;
+    type SelectedValues = V;
 
     fn write_selected_values<'s, 'a>(
         &'s self,
@@ -235,6 +255,7 @@ impl<
     type HasWhereClause = TypedTrue;
     type OutputFields = <T as SelectStatement>::OutputFields;
     type SelectFrom = S;
+    type SelectedValues = T::SelectedValues;
 
     fn write_where_clause<'s, 'a>(
         &'s self,
@@ -317,6 +338,7 @@ impl<
     type HasWhereClause = T::HasWhereClause;
     type OutputFields = <T as SelectStatement>::OutputFields;
     type SelectFrom = S;
+    type SelectedValues = T::SelectedValues;
 
     fn write_group_by_clause<'s, 'a>(
         &'s self,
@@ -389,6 +411,7 @@ pub struct DescendingOrder;
 impl Order for DescendingOrder {
     const ORDER_STR: &'static str = " DESC";
 }
+pub trait CanOrderBy<S: SelectFrom, T: SelectStatement<HasOrderByClause = TypedFalse>> {}
 
 pub struct WithOrderByClause<
     S: SelectFrom,
@@ -413,6 +436,7 @@ impl<
     type HasWhereClause = T::HasWhereClause;
     type OutputFields = <T as SelectStatement>::OutputFields;
     type SelectFrom = S;
+    type SelectedValues = T::SelectedValues;
 
     fn write_group_by_clause<'s, 'a>(
         &'s self,
@@ -485,6 +509,121 @@ pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
     }
 }
 impl<T: SelectStatement<HasOrderByClause = TypedFalse>> OrderBy for T {}
+
+/// A selected value which is used to order by
+pub trait SelectedValueToOrderBy {
+    type Name: FieldNameCharsConsListItem;
+
+    const NAME_STR: &'static str;
+}
+
+pub struct WithOrderBySelectedValueClause<
+    S: SelectFrom,
+    T: SelectStatement<HasOrderByClause = TypedFalse>,
+    B: SelectedValueToOrderBy,
+    O: Order,
+> {
+    statement: T,
+    order_by: B,
+    phantom: (PhantomData<S>, PhantomData<O>),
+}
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasOrderByClause = TypedFalse>,
+    B: SelectedValueToOrderBy + 'static,
+    O: Order + 'static,
+> SelectStatement for WithOrderBySelectedValueClause<S, T, B, O>
+{
+    type HasGroupByClause = T::HasGroupByClause;
+    type HasOrderByClause = TypedTrue;
+    type HasSelectedValues = T::HasSelectedValues;
+    type HasWhereClause = T::HasWhereClause;
+    type OutputFields = <T as SelectStatement>::OutputFields;
+    type SelectFrom = S;
+    type SelectedValues = T::SelectedValues;
+
+    fn write_group_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_group_by_clause(f, parameter_binder)
+    }
+
+    fn write_selected_values<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_selected_values(f, parameter_binder)
+    }
+
+    fn write_where_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_where_clause(f, parameter_binder)
+    }
+
+    fn write_order_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        _parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, " ORDER BY {}{}", B::NAME_STR, O::ORDER_STR)
+    }
+}
+
+pub trait OrderBySelectedValue<S: SelectableTables>:
+    SelectStatement<HasOrderByClause = TypedFalse>
+where
+    Self::SelectedValues: SelectedValues<S>,
+{
+    fn order_by_selected_value_ascending<B: SelectedValueToOrderBy>(
+        self,
+        order_by: B,
+    ) -> WithOrderBySelectedValueClause<Self::SelectFrom, Self, B, AscendingOrder>
+    where
+        Self::SelectedValues: SelectedValuesContainsFieldWithName<B::Name>,
+    {
+        WithOrderBySelectedValueClause {
+            statement: self,
+            order_by,
+            phantom: (PhantomData, PhantomData),
+        }
+    }
+
+    fn order_by_selected_value_descending<B: SelectedValueToOrderBy>(
+        self,
+        order_by: B,
+    ) -> WithOrderBySelectedValueClause<Self::SelectFrom, Self, B, DescendingOrder>
+    where
+        Self::SelectedValues: SelectedValuesContainsFieldWithName<B::Name>,
+    {
+        WithOrderBySelectedValueClause {
+            statement: self,
+            order_by,
+            phantom: (PhantomData, PhantomData),
+        }
+    }
+}
+impl<S: SelectableTables, T: SelectStatement<HasOrderByClause = TypedFalse>> OrderBySelectedValue<S> for T where
+    T::SelectedValues: SelectedValues<S>
+{
+}
 
 /// Something which you can select from.
 /// This can be a table or multiple joined tables.

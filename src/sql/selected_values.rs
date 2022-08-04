@@ -1,5 +1,7 @@
 use crate::sql::{FieldsConsListItem, ParameterBinder, SelectableTables};
 
+use super::FieldNameCharsConsListItem;
+
 /// The selected values in an sql query.
 pub trait SelectedValues<S: SelectableTables> {
     type Fields: FieldsConsListItem;
@@ -16,3 +18,7 @@ pub trait SelectedValues<S: SelectableTables> {
     where
         's: 'a;
 }
+
+/// A marker trait which indicates that the list of selected values contains a field with the given
+/// name.
+pub trait SelectedValuesContainsFieldWithName<N: FieldNameCharsConsListItem>{}

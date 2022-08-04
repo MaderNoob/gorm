@@ -9,7 +9,7 @@ mod util;
 
 pub use async_trait::async_trait;
 pub use error::*;
-pub use gorm_macros::{migration, select_values, FromQueryResult, Table};
+pub use gorm_macros::{migration, select_values, selected_value_to_order_by, FromQueryResult, Table};
 pub use rust_decimal::Decimal;
 pub use sql::{FromQueryResult, Table};
 pub use tokio_postgres;

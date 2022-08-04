@@ -70,7 +70,7 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
         S: ::gorm::sql::SelectableTables,
         #(#struct_expr_generics_definition),*
     };
-    let struct_generics_definition_clone = struct_generics_definition.clone();
+    let struct_generics_definition_ref = &struct_generics_definition;
 
     let struct_tuple_fields_definition = (0..select_values_input.values.len())
         .map(|i| proc_macro2::Ident::new(&format!("E{}", i), proc_macro2::Span::call_site()));
@@ -135,15 +135,29 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
         .iter()
         .map(|selected_value| &selected_value.selected_expr);
 
+    let use_expr_generics_in_impl_clone = use_expr_generics_in_impl.clone();
+    let impl_contains_field_names = select_values_input.values.iter().map(|selected_value|{
+        let name_string = selected_value.select_as.to_string();
+        let field_name_type = generate_field_name_cons_list_type(&name_string);
+        let use_expr_generics_in_impl = use_expr_generics_in_impl_clone.clone();
+        quote!{
+            #[automatically_derived]
+            impl<#struct_generics_definition_ref>
+                ::gorm::sql::SelectedValuesContainsFieldWithName<#field_name_type> for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
+            {
+            }
+        }
+    });
+
     quote! {
         {
-            struct CustomSelectedValues<#struct_generics_definition>(
+            struct CustomSelectedValues<#struct_generics_definition_ref>(
                 #(#struct_tuple_fields_definition),* ,
                 ::std::marker::PhantomData<S>,
             );
 
             #[automatically_derived]
-            impl<#struct_generics_definition_clone>
+            impl<#struct_generics_definition_ref>
                 ::gorm::sql::SelectedValues<S> for CustomSelectedValues<S, #(#use_expr_generics_in_impl),*>
             {
                 type Fields = #fields_cons_list;
@@ -164,6 +178,11 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
                     Ok(())
                 }
             }
+
+            #(
+                #impl_contains_field_names
+            )*
+
             CustomSelectedValues(#(#create_instance_tuple_values),* , ::std::marker::PhantomData)
         }
     }.into()

@@ -3,6 +3,7 @@ mod migration;
 mod select_values;
 mod table;
 mod util;
+mod selected_value_to_order_by;
 
 use proc_macro::TokenStream;
 use util::generate_field_name_cons_list_type;
@@ -30,4 +31,9 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Table, attributes(table))]
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     table::table(input_tokens)
+}
+
+#[proc_macro]
+pub fn selected_value_to_order_by(input_tokens: TokenStream) -> TokenStream {
+    selected_value_to_order_by::selected_value_to_order_by(input_tokens)
 }
