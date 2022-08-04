@@ -17,6 +17,7 @@ pub trait SelectStatement: SqlStatement {
     type HasSelectedValues: TypedBool;
     type HasWhereClause: TypedBool;
     type HasGroupByClause: TypedBool;
+    type HasOrderByClause: TypedBool;
 
     fn write_selected_values<'s, 'a>(
         &'s self,
@@ -41,6 +42,14 @@ pub trait SelectStatement: SqlStatement {
     ) -> std::fmt::Result
     where
         's: 'a;
+
+    fn write_order_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a;
 }
 
 impl<T: SelectStatement> SqlStatement for T {
@@ -59,7 +68,8 @@ impl<T: SelectStatement> SqlStatement for T {
         write!(f, " FROM ")?;
         <Self as SelectStatement>::SelectFrom::write_sql_from_string(f)?;
         self.write_where_clause(f, parameter_binder)?;
-        self.write_group_by_clause(f, parameter_binder)
+        self.write_group_by_clause(f, parameter_binder)?;
+        self.write_order_by_clause(f, parameter_binder)
     }
 }
 
@@ -72,6 +82,7 @@ impl<S: SelectFrom> EmptySelectStatement<S> {
 }
 impl<S: SelectFrom + 'static> SelectStatement for EmptySelectStatement<S> {
     type HasGroupByClause = TypedFalse;
+    type HasOrderByClause = TypedFalse;
     type HasSelectedValues = TypedFalse;
     type HasWhereClause = TypedFalse;
     type OutputFields = <S::LeftMostTable as Table>::Fields;
@@ -109,6 +120,17 @@ impl<S: SelectFrom + 'static> SelectStatement for EmptySelectStatement<S> {
     {
         Ok(())
     }
+
+    fn write_order_by_clause<'s, 'a>(
+        &'s self,
+        _f: &mut String,
+        _parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        Ok(())
+    }
 }
 
 pub struct WithSelectedValues<
@@ -127,6 +149,7 @@ impl<
 > SelectStatement for WithSelectedValues<S, T, V>
 {
     type HasGroupByClause = T::HasGroupByClause;
+    type HasOrderByClause = T::HasOrderByClause;
     type HasSelectedValues = TypedTrue;
     type HasWhereClause = T::HasWhereClause;
     type OutputFields = V::Fields;
@@ -164,6 +187,17 @@ impl<
     {
         self.statement.write_group_by_clause(f, parameter_binder)
     }
+
+    fn write_order_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_order_by_clause(f, parameter_binder)
+    }
 }
 
 pub trait SelectValues: SelectStatement<HasSelectedValues = TypedFalse> {
@@ -196,6 +230,7 @@ impl<
 > SelectStatement for WithWhereClause<S, T, C>
 {
     type HasGroupByClause = T::HasGroupByClause;
+    type HasOrderByClause = T::HasOrderByClause;
     type HasSelectedValues = T::HasSelectedValues;
     type HasWhereClause = TypedTrue;
     type OutputFields = <T as SelectStatement>::OutputFields;
@@ -234,6 +269,17 @@ impl<
     {
         self.statement.write_group_by_clause(f, parameter_binder)
     }
+
+    fn write_order_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_order_by_clause(f, parameter_binder)
+    }
 }
 
 pub trait Filter: SelectStatement<HasWhereClause = TypedFalse> {
@@ -266,6 +312,7 @@ impl<
 > SelectStatement for WithGroupByClause<S, T, G>
 {
     type HasGroupByClause = TypedTrue;
+    type HasOrderByClause = T::HasOrderByClause;
     type HasSelectedValues = T::HasSelectedValues;
     type HasWhereClause = T::HasWhereClause;
     type OutputFields = <T as SelectStatement>::OutputFields;
@@ -304,6 +351,17 @@ impl<
     {
         self.statement.write_where_clause(f, parameter_binder)
     }
+
+    fn write_order_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_order_by_clause(f, parameter_binder)
+    }
 }
 
 pub trait GroupBy: SelectStatement<HasGroupByClause = TypedFalse> {
@@ -319,6 +377,114 @@ pub trait GroupBy: SelectStatement<HasGroupByClause = TypedFalse> {
     }
 }
 impl<T: SelectStatement<HasGroupByClause = TypedFalse>> GroupBy for T {}
+
+pub trait Order {
+    const ORDER_STR: &'static str;
+}
+pub struct AscendingOrder;
+impl Order for AscendingOrder {
+    const ORDER_STR: &'static str = "";
+}
+pub struct DescendingOrder;
+impl Order for DescendingOrder {
+    const ORDER_STR: &'static str = " DESC";
+}
+
+pub struct WithOrderByClause<
+    S: SelectFrom,
+    T: SelectStatement<HasOrderByClause = TypedFalse>,
+    B: SqlExpression<S::SelectableTables>,
+    O: Order,
+> {
+    statement: T,
+    order_by: B,
+    phantom: (PhantomData<S>, PhantomData<O>),
+}
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasOrderByClause = TypedFalse>,
+    B: SqlExpression<S::SelectableTables> + 'static,
+    O: Order + 'static,
+> SelectStatement for WithOrderByClause<S, T, B, O>
+{
+    type HasGroupByClause = T::HasGroupByClause;
+    type HasOrderByClause = TypedTrue;
+    type HasSelectedValues = T::HasSelectedValues;
+    type HasWhereClause = T::HasWhereClause;
+    type OutputFields = <T as SelectStatement>::OutputFields;
+    type SelectFrom = S;
+
+    fn write_group_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_group_by_clause(f, parameter_binder)
+    }
+
+    fn write_selected_values<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_selected_values(f, parameter_binder)
+    }
+
+    fn write_where_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_where_clause(f, parameter_binder)
+    }
+
+    fn write_order_by_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, " ORDER BY ")?;
+        self.order_by.write_sql_string(f, parameter_binder)?;
+        write!(f, "{}", O::ORDER_STR)
+    }
+}
+
+pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
+    fn order_by_ascending<B: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
+        self,
+        order_by: B,
+    ) -> WithOrderByClause<Self::SelectFrom, Self, B, AscendingOrder> {
+        WithOrderByClause {
+            statement: self,
+            order_by,
+            phantom: (PhantomData, PhantomData),
+        }
+    }
+
+    fn order_by_descending<B: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
+        self,
+        order_by: B,
+    ) -> WithOrderByClause<Self::SelectFrom, Self, B, DescendingOrder> {
+        WithOrderByClause {
+            statement: self,
+            order_by,
+            phantom: (PhantomData, PhantomData),
+        }
+    }
+}
+impl<T: SelectStatement<HasOrderByClause = TypedFalse>> OrderBy for T {}
 
 /// Something which you can select from.
 /// This can be a table or multiple joined tables.

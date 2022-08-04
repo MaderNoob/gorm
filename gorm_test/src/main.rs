@@ -9,7 +9,7 @@ use gorm::{
         OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
     statements::{
-        ExecuteSqlStatment, Filter, InnerJoinTrait, LoadSqlStatment, SelectFrom, SelectValues, WithWhereClause, SelectStatement, GroupBy,
+        ExecuteSqlStatment, Filter, InnerJoinTrait, LoadSqlStatment, SelectFrom, SelectValues, WithWhereClause, SelectStatement, GroupBy, OrderBy,
     },
     Decimal, FromQueryResult, Table,
 };
@@ -43,6 +43,16 @@ async fn main() {
     .await
     .unwrap();
 
+    person::new {
+        name: "Avi".to_string(),
+        age: 17,
+        school_id: 1,
+        pet_id: None,
+    }
+    .insert(&client)
+    .await
+    .unwrap();
+
     #[derive(Debug, FromQueryResult)]
     struct PersonNameAndSchoolName {
         name: String,
@@ -58,6 +68,7 @@ async fn main() {
                 .or(school::name.equals("mekif").and(school::id.greater_than(2))),
         )
         .select(select_values!(person::name, school::name as school_name))
+        .order_by_ascending(person::name)
         .load_all::<PersonNameAndSchoolName>(&client)
         .await
         .unwrap();
