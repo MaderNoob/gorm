@@ -1,9 +1,12 @@
-use super::ParameterBinder;
+use super::{ParameterBinder, SelectedValues};
 use crate::{
     error::*,
     execution::{ExecuteResult, SqlStatementExecutor},
-    statements::{ExecuteSqlStatment, InsertStatement},
-    Table,
+    statements::{
+        ExecuteSqlStatment, InsertStatement, LoadSqlStatment, ReturningInsertStatement,
+        SqlStatement,
+    },
+    FromQueryResult, Table, TypedConsListNil, TypesNotEqual,
 };
 
 #[async_trait::async_trait]
@@ -30,5 +33,18 @@ pub trait Insertable: Sized + 'static {
 
     async fn insert(self, to: &(impl SqlStatementExecutor + Send + Sync)) -> Result<ExecuteResult> {
         InsertStatement::new(self).execute(to).await
+    }
+
+    async fn insert_returning<O: FromQueryResult + Send>(
+        self,
+        returning: impl SelectedValues<Self::Table, Fields = O::Fields> + Send + 'static,
+        to: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<O>
+    where
+        (O::Fields, TypedConsListNil): TypesNotEqual,
+    {
+        ReturningInsertStatement::new(self, returning)
+            .load_one(to)
+            .await
     }
 }

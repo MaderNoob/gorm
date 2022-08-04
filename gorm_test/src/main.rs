@@ -2,7 +2,7 @@
 
 use gorm::{
     execution::DatabaseConnection,
-    migration, select_values, selected_value_to_order_by,
+    migration, returning, select_values, selected_value_to_order_by,
     sql::{
         AddableSqlExpression, AverageableSqlExpression, BooleanAndableSqlExpression,
         BooleanOrableSqlExpression, Insertable, Migration, MultipliableSqlExpression,
@@ -44,15 +44,22 @@ async fn main() {
     .await
     .unwrap();
 
-    person::new {
+    #[derive(Debug, FromQueryResult)]
+    struct NewPersonInfo{
+        id: i32,
+    }
+    let new_person_info = person::new {
         name: "Avi".to_string(),
         age: 17,
         school_id: 1,
         pet_id: Some(5),
     }
-    .insert(&client)
+    .insert_returning::<Person>(person::all, &client)
     .await
     .unwrap();
+
+    println!("new person info: {:?}", new_person_info);
+
 
     #[derive(Debug, FromQueryResult)]
     struct PersonNameAndSchoolName {
