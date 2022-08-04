@@ -1,7 +1,5 @@
 #![feature(auto_traits)]
 #![feature(negative_impls)]
-#![feature(generic_associated_types)]
-#![feature(associated_const_equality)]
 
 mod error;
 pub mod execution;
