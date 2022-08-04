@@ -9,8 +9,9 @@ use gorm::{
         OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
     statements::{
-        ExecuteSqlStatment, Filter, GroupBy, InnerJoinTrait, LoadSqlStatment, OrderBy,
-        OrderBySelectedValue, SelectFrom, SelectStatement, SelectValues, WithWhereClause,
+        ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy, InnerJoinTrait,
+        LoadSqlStatment, OrderBy, OrderBySelectedValue, Returning, SelectFrom, SelectStatement,
+        SelectValues, WithWhereClause,
     },
     Decimal, FromQueryResult, Table,
 };
@@ -45,7 +46,7 @@ async fn main() {
     .unwrap();
 
     #[derive(Debug, FromQueryResult)]
-    struct NewPersonInfo{
+    struct NewPersonInfo {
         id: i32,
     }
     let new_person_info = person::new {
@@ -60,6 +61,14 @@ async fn main() {
 
     println!("new person info: {:?}", new_person_info);
 
+    let deleted_people = person::table
+        .delete()
+        .filter(person::id.lower_than(10))
+        .returning(person::all)
+        .load_all::<Person>(&client)
+        .await
+        .unwrap();
+    println!("deleted people: {:?}", deleted_people);
 
     #[derive(Debug, FromQueryResult)]
     struct PersonNameAndSchoolName {

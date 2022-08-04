@@ -1,6 +1,6 @@
 use crate::{
     sql::{FieldsConsListItem, IntoSqlType, SqlType},
-    statements::{CreateTableStatement, DeleteStatement, DropTableStatement},
+    statements::{CreateTableStatement, EmptyDeleteStatement, DropTableStatement},
 };
 
 /// A table in the database.
@@ -44,8 +44,8 @@ pub trait TableMarker: Sized + 'static {
     }
 
     /// Returns a delete statement for this table
-    fn delete(self) -> DeleteStatement<Self::Table> {
-        DeleteStatement::new()
+    fn delete(self) -> EmptyDeleteStatement<Self::Table> {
+        EmptyDeleteStatement::new()
     }
 }
 

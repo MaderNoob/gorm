@@ -68,10 +68,6 @@ pub trait SelectStatement: SqlStatement {
     ) -> std::fmt::Result
     where
         's: 'a;
-}
-
-impl<T: SelectStatement> SqlStatement for T {
-    type OutputFields = <Self as SelectStatement>::OutputFields;
 
     fn write_sql_string<'s, 'a>(
         &'s self,
@@ -89,6 +85,23 @@ impl<T: SelectStatement> SqlStatement for T {
         self.write_group_by_clause(f, parameter_binder)?;
         self.write_order_by_clause(f, parameter_binder)
     }
+}
+
+macro_rules! impl_sql_statement_for_select_statement {
+    {} => {
+        type OutputFields = <Self as SelectStatement>::OutputFields;
+
+        fn write_sql_string<'s, 'a>(
+            &'s self,
+            f: &mut String,
+            parameter_binder: &mut ParameterBinder<'a>,
+        ) -> std::fmt::Result
+        where
+            's: 'a,
+        {
+            <Self as SelectStatement>::write_sql_string(&self, f, parameter_binder)
+        }
+    };
 }
 
 /// An sql statement for finding records in a table
@@ -150,6 +163,10 @@ impl<S: SelectFrom + 'static> SelectStatement for EmptySelectStatement<S> {
     {
         Ok(())
     }
+}
+
+impl<S: SelectFrom + 'static> SqlStatement for EmptySelectStatement<S> {
+    impl_sql_statement_for_select_statement! {}
 }
 
 pub struct WithSelectedValues<
@@ -218,6 +235,15 @@ impl<
     {
         self.statement.write_order_by_clause(f, parameter_binder)
     }
+}
+
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasSelectedValues = TypedFalse>,
+    V: SelectedValues<S::SelectableTables> + 'static,
+> SqlStatement for WithSelectedValues<S, T, V>
+{
+    impl_sql_statement_for_select_statement! {}
 }
 
 pub trait SelectValues: SelectStatement<HasSelectedValues = TypedFalse> {
@@ -303,6 +329,15 @@ impl<
     }
 }
 
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasWhereClause = TypedFalse>,
+    C: SqlCondition<S::SelectableTables> + 'static,
+> SqlStatement for WithWhereClause<S, T, C>
+{
+    impl_sql_statement_for_select_statement! {}
+}
+
 pub trait Filter: SelectStatement<HasWhereClause = TypedFalse> {
     fn filter<C: SqlCondition<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
         self,
@@ -384,6 +419,15 @@ impl<
     {
         self.statement.write_order_by_clause(f, parameter_binder)
     }
+}
+
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasGroupByClause = TypedFalse>,
+    G: SqlExpression<S::SelectableTables> + 'static,
+> SqlStatement for WithGroupByClause<S, T, G>
+{
+    impl_sql_statement_for_select_statement! {}
 }
 
 pub trait GroupBy: SelectStatement<HasGroupByClause = TypedFalse> {
@@ -483,6 +527,16 @@ impl<
         self.order_by.write_sql_string(f, parameter_binder)?;
         write!(f, "{}", O::ORDER_STR)
     }
+}
+
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasOrderByClause = TypedFalse>,
+    B: SqlExpression<S::SelectableTables> + 'static,
+    O: Order + 'static,
+> SqlStatement for WithOrderByClause<S, T, B, O>
+{
+    impl_sql_statement_for_select_statement! {}
 }
 
 pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
@@ -587,6 +641,15 @@ impl<
     }
 }
 
+impl<
+    S: SelectFrom + 'static,
+    T: SelectStatement<HasOrderByClause = TypedFalse>,
+    B: SelectedValueToOrderBy + 'static,
+    O: Order + 'static,
+> SqlStatement for WithOrderBySelectedValueClause<S, T, B, O>{
+    impl_sql_statement_for_select_statement!{}
+}
+
 pub trait OrderBySelectedValue<S: SelectableTables>:
     SelectStatement<HasOrderByClause = TypedFalse>
 where
@@ -620,8 +683,10 @@ where
         }
     }
 }
-impl<S: SelectableTables, T: SelectStatement<HasOrderByClause = TypedFalse>> OrderBySelectedValue<S> for T where
-    T::SelectedValues: SelectedValues<S>
+impl<S: SelectableTables, T: SelectStatement<HasOrderByClause = TypedFalse>> OrderBySelectedValue<S>
+    for T
+where
+    T::SelectedValues: SelectedValues<S>,
 {
 }
 
