@@ -2,16 +2,17 @@
 
 use gorm::{
     execution::DatabaseConnection,
-    migration, select_values,
+    migration, select_values, selected_value_to_order_by,
     sql::{
         AddableSqlExpression, AverageableSqlExpression, BooleanAndableSqlExpression,
         BooleanOrableSqlExpression, Insertable, Migration, MultipliableSqlExpression,
         OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
     statements::{
-        ExecuteSqlStatment, Filter, InnerJoinTrait, LoadSqlStatment, SelectFrom, SelectValues, WithWhereClause, SelectStatement, GroupBy, OrderBy, OrderBySelectedValue,
+        ExecuteSqlStatment, Filter, GroupBy, InnerJoinTrait, LoadSqlStatment, OrderBy,
+        OrderBySelectedValue, SelectFrom, SelectStatement, SelectValues, WithWhereClause,
     },
-    Decimal, FromQueryResult, Table, selected_value_to_order_by,
+    Decimal, FromQueryResult, Table,
 };
 
 struct CreateTablesMigration;
@@ -47,7 +48,7 @@ async fn main() {
         name: "Avi".to_string(),
         age: 17,
         school_id: 1,
-        pet_id: None,
+        pet_id: Some(5),
     }
     .insert(&client)
     .await
@@ -93,6 +94,15 @@ async fn main() {
         .unwrap();
 
     println!("{:?}", p);
+
+    let people = person::table
+        .find()
+        .select(person::all)
+        .load_all::<Person>(&client)
+        .await
+        .unwrap();
+
+    println!("people: {:?}", people);
 }
 
 #[derive(Debug, Table)]

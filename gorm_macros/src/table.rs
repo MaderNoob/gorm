@@ -79,6 +79,8 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     let insertable = implement_insertable(&table_struct_ident, &fields);
 
+    let all_fields_selected_struct = implement_all_fields_selected_struct(&fields_type, &table_struct_ident, &table_name);
+
     quote! {
         #[automatically_derived]
         impl ::gorm::sql::Table for #table_struct_ident {
@@ -119,6 +121,8 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             #table_marker
 
             #insertable
+
+            #all_fields_selected_struct
         }
     }
     .into()
@@ -246,7 +250,7 @@ fn implement_insertable(
 
     let value_names = fields_other_than_id
         .iter()
-        .map(|(ident, _ty)| ident.to_string())
+        .map(|(ident, _ty)| ident)
         .join(",");
 
     let write_each_field_value = fields_other_than_id.iter().enumerate().map(
@@ -295,6 +299,40 @@ fn implement_insertable(
                 )*
 
                 Ok(())
+            }
+        }
+    }
+}
+
+fn implement_all_fields_selected_struct(
+    fields_cons_list_type: &proc_macro2::TokenStream,
+    table_struct_ident: &proc_macro2::Ident,
+    table_name: &str,
+) -> proc_macro2::TokenStream {
+    let table_dot_asterisk = format!("\"{}\".*", table_name);
+
+    quote!{
+        pub struct all;
+
+        impl<
+            S: ::gorm::sql::SelectableTables 
+                + ::gorm::sql::SelectableTablesContains<super::#table_struct_ident>
+        > ::gorm::sql::SelectedValues<S> for all {
+            type Fields = #fields_cons_list_type;
+
+            const IS_AGGREGATE: bool = false;
+
+            fn write_sql_string<'s, 'a>(
+                &'s self,
+                f: &mut ::std::string::String,
+                _parameter_binder: &mut ::gorm::sql::ParameterBinder<'a>,
+            ) -> ::std::fmt::Result
+            where
+                's: 'a
+            {
+                use ::std::fmt::Write;
+
+                ::std::write!(f, #table_dot_asterisk)
             }
         }
     }
