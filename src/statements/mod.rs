@@ -10,11 +10,15 @@ pub use delete::*;
 pub use drop_table::*;
 pub use insert::*;
 pub use select::*;
+use tokio_postgres::types::{FromSql, FromSqlOwned};
 
 use crate::{
     error::*,
     execution::{ExecuteResult, SqlStatementExecutor},
-    sql::{FieldsConsListItem, FromQueryResult, ParameterBinder},
+    sql::{
+        FieldNameCharsConsListItem, FieldsConsListCons, FieldsConsListItem, FromQueryResult,
+        ParameterBinder,
+    },
     TypedConsListNil, TypesNotEqual,
 };
 
@@ -85,3 +89,37 @@ where
 
 #[async_trait]
 impl<S: SqlStatement> LoadSqlStatment for S where (S::OutputFields, TypedConsListNil): TypesNotEqual {}
+
+#[async_trait]
+pub trait LoadSingleColumnSqlStatment<
+    FieldName: FieldNameCharsConsListItem,
+    FieldType: FromSqlOwned + Send,
+>: SqlStatement<OutputFields = FieldsConsListCons<FieldName, FieldType, TypedConsListNil>>
+{
+    async fn load_one_value(self, on: &(impl SqlStatementExecutor + Send + Sync)) -> Result<FieldType> {
+        on.load_one_one_column(self).await
+    }
+
+    async fn load_optional_value(
+        self,
+        on: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<Option<FieldType>> {
+        on.load_optional_one_column(self).await
+    }
+
+    async fn load_all_values(
+        self,
+        on: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<Vec<FieldType>> {
+        on.load_all_one_column(self).await
+    }
+}
+
+#[async_trait]
+impl<
+    FieldName: FieldNameCharsConsListItem,
+    FieldType: FromSqlOwned + Send,
+    S: SqlStatement<OutputFields = FieldsConsListCons<FieldName, FieldType, TypedConsListNil>>,
+> LoadSingleColumnSqlStatment<FieldName, FieldType> for S
+{
+}

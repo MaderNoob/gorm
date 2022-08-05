@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use tokio_postgres::types::{FromSql, FromSqlOwned};
 
 use crate::{error::*, sql::FromQueryResult, statements::SqlStatement};
 
@@ -16,12 +17,27 @@ pub trait SqlStatementExecutor: Sized {
         statement: S,
     ) -> Result<O>;
 
+    async fn load_one_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+        &self,
+        statement: S,
+    ) -> Result<O>;
+
     async fn load_optional<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
         statement: S,
     ) -> Result<Option<O>>;
 
+    async fn load_optional_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+        &self,
+        statement: S,
+    ) -> Result<Option<O>>;
+
     async fn load_all<O: FromQueryResult + Send, S: SqlStatement + Send>(
+        &self,
+        statement: S,
+    ) -> Result<Vec<O>>;
+
+    async fn load_all_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
         &self,
         statement: S,
     ) -> Result<Vec<O>>;

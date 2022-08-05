@@ -1,10 +1,12 @@
-use super::{ParameterBinder, SelectedValues};
+use tokio_postgres::types::FromSqlOwned;
+
+use super::{FieldNameCharsConsListItem, FieldsConsListCons, ParameterBinder, SelectedValues};
 use crate::{
     error::*,
     execution::{ExecuteResult, SqlStatementExecutor},
     statements::{
-        ExecuteSqlStatment, InsertStatement, LoadSqlStatment, ReturningInsertStatement,
-        SqlStatement,
+        ExecuteSqlStatment, InsertStatement, LoadSingleColumnSqlStatment, LoadSqlStatment,
+        ReturningInsertStatement, SqlStatement,
     },
     FromQueryResult, Table, TypedConsListNil, TypesNotEqual,
 };
@@ -45,6 +47,23 @@ pub trait Insertable: Sized + 'static {
     {
         ReturningInsertStatement::new(self, returning)
             .load_one(to)
+            .await
+    }
+
+    async fn insert_returning_value<
+        FieldName: FieldNameCharsConsListItem,
+        FieldType: FromSqlOwned + Send,
+    >(
+        self,
+        returning: impl SelectedValues<
+            Self::Table,
+            Fields = FieldsConsListCons<FieldName, FieldType, TypedConsListNil>,
+        > + Send
+        + 'static,
+        to: &(impl SqlStatementExecutor + Send + Sync),
+    ) -> Result<FieldType> {
+        ReturningInsertStatement::new(self, returning)
+            .load_one_value(to)
             .await
     }
 }

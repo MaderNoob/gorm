@@ -11,7 +11,7 @@ use gorm::{
     statements::{
         ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy, InnerJoinTrait,
         LoadSqlStatment, OrderBy, OrderBySelectedValue, Returning, SelectFrom, SelectStatement,
-        SelectValues, WithWhereClause,
+        SelectValues, WithWhereClause, LoadSingleColumnSqlStatment,
     },
     Decimal, FromQueryResult, Table,
 };
@@ -35,15 +35,10 @@ async fn main() {
     .await
     .unwrap();
 
-    #[derive(Debug, FromQueryResult)]
-    struct PetId{
-        id: i32,
-    }
-
     let pet_id = pet::new {
         name: "Kitty".to_string(),
     }
-    .insert_returning::<PetId>(returning!(pet::id), &client)
+    .insert_returning_value(returning!(pet::id), &client)
     .await
     .unwrap();
 
@@ -65,7 +60,7 @@ async fn main() {
         name: "Avi".to_string(),
         age: 17,
         school_id: 1,
-        pet_id: Some(pet_id.id),
+        pet_id: Some(pet_id),
     }
     .insert_returning::<Person>(person::all, &client)
     .await
@@ -73,14 +68,14 @@ async fn main() {
 
     println!("new person info: {:?}", new_person_info);
 
-    // let deleted_people = person::table
+    // let deleted_people_ids = person::table
     //     .delete()
     //     .filter(person::id.lower_than(10))
-    //     .returning(person::all)
-    //     .load_all::<Person>(&client)
+    //     .returning(returning!(person::id))
+    //     .load_all_values(&client)
     //     .await
     //     .unwrap();
-    // println!("deleted people: {:?}", deleted_people);
+    // println!("deleted people: {:?}", deleted_people_ids);
 
     #[derive(Debug, FromQueryResult)]
     struct PersonNameAndSchoolName {
@@ -146,6 +141,9 @@ async fn main() {
         .await
         .unwrap();
 
+    println!("{:?}", p);
+
+    let p = person::table.find().select(select_values!(person::name)).load_all_values(&client).await.unwrap();
     println!("{:?}", p);
 }
 
