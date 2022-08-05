@@ -1,6 +1,7 @@
 use crate::{
     sql::{FieldsConsListItem, IntoSqlType, SqlType},
-    statements::{CreateTableStatement, EmptyDeleteStatement, DropTableStatement},
+    statements::{CreateTableStatement, DropTableStatement, EmptyDeleteStatement},
+    TypesEqual,
 };
 
 /// A table in the database.
@@ -25,6 +26,7 @@ pub trait Column {
     const COLUMN_NAME: &'static str;
     type Table: Table;
     type SqlType: SqlType;
+
     type RustType: IntoSqlType<SqlType = Self::SqlType>;
 }
 
@@ -50,6 +52,12 @@ pub trait TableMarker: Sized + 'static {
 }
 
 /// Indicates that some table has a foreign key to some other table
-pub trait HasForeignKey<T: Table>: Table {
-    type ForeignKeyColumn: Column<SqlType = <T::IdColumn as Column>::SqlType>;
+pub trait HasForeignKey<T: Table>: Table
+where
+    (
+        <<Self::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType,
+        <T::IdColumn as Column>::SqlType,
+    ): TypesEqual,
+{
+    type ForeignKeyColumn: Column;
 }

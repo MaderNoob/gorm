@@ -10,7 +10,7 @@ pub fn selected_value_to_order_by(input_tokens: TokenStream) -> TokenStream {
 
     let field_name_type = generate_field_name_cons_list_type(&selected_value_name_string);
 
-    quote!{
+    quote! {
         {
             struct CustomSelectedValueToOrderBy;
 
@@ -21,5 +21,6 @@ pub fn selected_value_to_order_by(input_tokens: TokenStream) -> TokenStream {
 
             CustomSelectedValueToOrderBy
         }
-    }.into()
+    }
+    .into()
 }

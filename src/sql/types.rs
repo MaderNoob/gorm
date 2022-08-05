@@ -3,15 +3,22 @@ use rust_decimal::Decimal;
 /// An sql type.
 pub trait SqlType {
     type RustType: IntoSqlType<SqlType = Self>;
+
+    /// If `Self` is an `SqlOption`, then this type will contain the type inside
+    /// the `SqlOption`. Otherwise this is the same as `Self`.
+    ///
+    /// This is used to allow foreign keys with optional types.
+    type NonNullSqlType: SqlType;
+
     const SQL_NAME: &'static str;
-    const IS_NULL:bool;
+    const IS_NULL: bool;
 }
 
 /// An sql serial type.
 pub trait SqlSerialType {
     type RustType: IntoSqlSerialType<SqlSerialType = Self>;
     const SQL_NAME: &'static str;
-    const IS_NULL:bool;
+    const IS_NULL: bool;
 }
 
 /// A trait used to convert a rust type to its sql type.
@@ -31,6 +38,7 @@ macro_rules! define_generic_sql_type {
         pub struct $sql_type_name;
         impl SqlType for $sql_type_name{
             type RustType = $rust_type;
+            type NonNullSqlType = Self;
             const SQL_NAME:&'static str = $sql_name;
             const IS_NULL:bool = false;
         }
@@ -78,12 +86,14 @@ impl<'a> IntoSqlType for &'a str {
 }
 
 pub struct SqlOption<T: SqlType>(T);
-impl<T: SqlType> SqlType for SqlOption<T>{
+impl<T: SqlType> SqlType for SqlOption<T> {
+    type NonNullSqlType = T;
     type RustType = Option<T::RustType>;
+
+    const IS_NULL: bool = true;
     const SQL_NAME: &'static str = T::SQL_NAME;
-    const IS_NULL:bool = true;
 }
-impl<T:IntoSqlType> IntoSqlType for Option<T>{
+impl<T: IntoSqlType> IntoSqlType for Option<T> {
     type SqlType = SqlOption<T::SqlType>;
 }
 

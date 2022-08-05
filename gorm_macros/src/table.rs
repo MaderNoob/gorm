@@ -79,7 +79,8 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     let insertable = implement_insertable(&table_struct_ident, &fields);
 
-    let all_fields_selected_struct = implement_all_fields_selected_struct(&fields_type, &table_struct_ident, &table_name);
+    let all_fields_selected_struct =
+        implement_all_fields_selected_struct(&fields_type, &table_struct_ident, &table_name);
 
     quote! {
         #[automatically_derived]
@@ -311,11 +312,11 @@ fn implement_all_fields_selected_struct(
 ) -> proc_macro2::TokenStream {
     let table_dot_asterisk = format!("\"{}\".*", table_name);
 
-    quote!{
+    quote! {
         pub struct all;
 
         impl<
-            S: ::gorm::sql::SelectableTables 
+            S: ::gorm::sql::SelectableTables
                 + ::gorm::sql::SelectableTablesContains<super::#table_struct_ident>
         > ::gorm::sql::SelectedValues<S> for all {
             type Fields = #fields_cons_list_type;

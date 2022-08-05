@@ -35,6 +35,18 @@ async fn main() {
     .await
     .unwrap();
 
+    #[derive(Debug, FromQueryResult)]
+    struct PetId{
+        id: i32,
+    }
+
+    let pet_id = pet::new {
+        name: "Kitty".to_string(),
+    }
+    .insert_returning::<PetId>(returning!(pet::id), &client)
+    .await
+    .unwrap();
+
     person::new {
         name: "James".to_string(),
         age: 16,
@@ -53,7 +65,7 @@ async fn main() {
         name: "Avi".to_string(),
         age: 17,
         school_id: 1,
-        pet_id: Some(5),
+        pet_id: Some(pet_id.id),
     }
     .insert_returning::<Person>(person::all, &client)
     .await
@@ -61,14 +73,14 @@ async fn main() {
 
     println!("new person info: {:?}", new_person_info);
 
-    let deleted_people = person::table
-        .delete()
-        .filter(person::id.lower_than(10))
-        .returning(person::all)
-        .load_all::<Person>(&client)
-        .await
-        .unwrap();
-    println!("deleted people: {:?}", deleted_people);
+    // let deleted_people = person::table
+    //     .delete()
+    //     .filter(person::id.lower_than(10))
+    //     .returning(person::all)
+    //     .load_all::<Person>(&client)
+    //     .await
+    //     .unwrap();
+    // println!("deleted people: {:?}", deleted_people);
 
     #[derive(Debug, FromQueryResult)]
     struct PersonNameAndSchoolName {
@@ -119,6 +131,22 @@ async fn main() {
         .unwrap();
 
     println!("people: {:?}", people);
+
+    #[derive(Debug, FromQueryResult)]
+    struct PersonAndPetName {
+        name: String,
+        pet_name: String,
+    }
+
+    let p = person::table
+        .inner_join(pet::table)
+        .find()
+        .select(select_values!(person::name, pet::name as pet_name))
+        .load_all::<PersonAndPetName>(&client)
+        .await
+        .unwrap();
+
+    println!("{:?}", p);
 }
 
 #[derive(Debug, Table)]
@@ -130,6 +158,7 @@ pub struct Person {
     #[table(foreign_key = "School")]
     school_id: i32,
 
+    #[table(foreign_key = "Pet")]
     pet_id: Option<i32>,
 }
 

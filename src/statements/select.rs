@@ -5,9 +5,10 @@ use crate::{
     sql::{
         Column, CombineSelectableTables, CombinedSelectableTables, FieldNameCharsConsListItem,
         FieldsConsListItem, HasForeignKey, ParameterBinder, SelectableTables, SelectedValues,
-        SelectedValuesContainsFieldWithName, SqlCondition, SqlExpression, Table, TableMarker,
+        SelectedValuesContainsFieldWithName, SqlCondition, SqlExpression, SqlType, Table,
+        TableMarker,
     },
-    TypedBool, TypedFalse, TypedTrue,
+    TypedBool, TypedFalse, TypedTrue, TypesEqual,
 };
 
 pub trait SelectStatement: SqlStatement {
@@ -646,8 +647,9 @@ impl<
     T: SelectStatement<HasOrderByClause = TypedFalse>,
     B: SelectedValueToOrderBy + 'static,
     O: Order + 'static,
-> SqlStatement for WithOrderBySelectedValueClause<S, T, B, O>{
-    impl_sql_statement_for_select_statement!{}
+> SqlStatement for WithOrderBySelectedValueClause<S, T, B, O>
+{
+    impl_sql_statement_for_select_statement! {}
 }
 
 pub trait OrderBySelectedValue<S: SelectableTables>:
@@ -735,6 +737,7 @@ impl<A: SelectFrom, B: SelectFrom> SelectFrom for InnerJoined<A, B>
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
     A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
+    (<<<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
 {
     type LeftMostTable = A::LeftMostTable;
     type SelectableTables = CombinedSelectableTables<A::SelectableTables, B::SelectableTables>;
@@ -763,6 +766,7 @@ pub trait InnerJoinTrait: Sized + SelectFrom {
     fn inner_join<S: SelectFrom>(self, _with: S) -> InnerJoined<Self, S>
     where
         Self::LeftMostTable: HasForeignKey<S::LeftMostTable>,
+    (<<<Self::LeftMostTable as HasForeignKey<S::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<S::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
     {
         InnerJoined::new()
     }

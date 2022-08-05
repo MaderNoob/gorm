@@ -9,7 +9,7 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
         table_names,
     } = migration_input;
 
-    let map_result_to_unit_type_fn_definition = quote!{
+    let map_result_to_unit_type_fn_definition = quote! {
         fn map_result_to_unit_type(result: ::gorm::Result<::gorm::execution::ExecuteResult>)->::gorm::Result<()>{
             result.map(|_| ())
         }

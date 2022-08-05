@@ -1,9 +1,9 @@
 mod from_query_result;
 mod migration;
 mod select_values;
+mod selected_value_to_order_by;
 mod table;
 mod util;
-mod selected_value_to_order_by;
 
 use proc_macro::TokenStream;
 use util::generate_field_name_cons_list_type;
