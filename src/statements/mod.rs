@@ -10,7 +10,7 @@ pub use delete::*;
 pub use drop_table::*;
 pub use insert::*;
 pub use select::*;
-use tokio_postgres::types::{FromSql, FromSqlOwned};
+use tokio_postgres::types::FromSqlOwned;
 
 use crate::{
     error::*,
@@ -51,7 +51,7 @@ pub trait ExecuteSqlStatment: SqlStatement {
     /// Executes the query on the given executor
     async fn execute(
         self,
-        on: &(impl SqlStatementExecutor + Send + Sync),
+        on: &impl SqlStatementExecutor,
     ) -> Result<ExecuteResult> {
         on.execute(self).await
     }
@@ -67,21 +67,21 @@ where
 {
     async fn load_one<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
         self,
-        on: &(impl SqlStatementExecutor + Send + Sync),
+        on: &impl SqlStatementExecutor,
     ) -> Result<O> {
         on.load_one(self).await
     }
 
     async fn load_optional<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
         self,
-        on: &(impl SqlStatementExecutor + Send + Sync),
+        on: &impl SqlStatementExecutor,
     ) -> Result<Option<O>> {
         on.load_optional(self).await
     }
 
     async fn load_all<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
         self,
-        on: &(impl SqlStatementExecutor + Send + Sync),
+        on: &impl SqlStatementExecutor,
     ) -> Result<Vec<O>> {
         on.load_all(self).await
     }
@@ -96,20 +96,20 @@ pub trait LoadSingleColumnSqlStatment<
     FieldType: FromSqlOwned + Send,
 >: SqlStatement<OutputFields = FieldsConsListCons<FieldName, FieldType, TypedConsListNil>>
 {
-    async fn load_one_value(self, on: &(impl SqlStatementExecutor + Send + Sync)) -> Result<FieldType> {
+    async fn load_one_value(self, on: &impl SqlStatementExecutor) -> Result<FieldType> {
         on.load_one_one_column(self).await
     }
 
     async fn load_optional_value(
         self,
-        on: &(impl SqlStatementExecutor + Send + Sync),
+        on: &impl SqlStatementExecutor,
     ) -> Result<Option<FieldType>> {
         on.load_optional_one_column(self).await
     }
 
     async fn load_all_values(
         self,
-        on: &(impl SqlStatementExecutor + Send + Sync),
+        on: &impl SqlStatementExecutor,
     ) -> Result<Vec<FieldType>> {
         on.load_all_one_column(self).await
     }

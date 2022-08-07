@@ -1,8 +1,5 @@
 use super::FieldNameCharsConsListItem;
-use crate::{
-    sql::{FieldsConsListItem, ParameterBinder, SelectableTables},
-    TypedConsListNil, TypesNotEqual,
-};
+use crate::sql::{FieldsConsListItem, ParameterBinder, SelectableTables};
 
 /// The selected values in an sql query.
 pub trait SelectedValues<S: SelectableTables> {

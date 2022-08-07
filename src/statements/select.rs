@@ -466,7 +466,7 @@ pub struct WithOrderByClause<
 > {
     statement: T,
     order_by: B,
-    phantom: (PhantomData<S>, PhantomData<O>),
+    _phantom: (PhantomData<S>, PhantomData<O>),
 }
 impl<
     S: SelectFrom + 'static,
@@ -548,7 +548,7 @@ pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
         WithOrderByClause {
             statement: self,
             order_by,
-            phantom: (PhantomData, PhantomData),
+            _phantom: (PhantomData, PhantomData),
         }
     }
 
@@ -559,7 +559,7 @@ pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
         WithOrderByClause {
             statement: self,
             order_by,
-            phantom: (PhantomData, PhantomData),
+            _phantom: (PhantomData, PhantomData),
         }
     }
 }
@@ -579,8 +579,8 @@ pub struct WithOrderBySelectedValueClause<
     O: Order,
 > {
     statement: T,
-    order_by: B,
-    phantom: (PhantomData<S>, PhantomData<O>),
+    _order_by: B,
+    _phantom: (PhantomData<S>, PhantomData<O>),
 }
 impl<
     S: SelectFrom + 'static,
@@ -666,8 +666,8 @@ where
     {
         WithOrderBySelectedValueClause {
             statement: self,
-            order_by,
-            phantom: (PhantomData, PhantomData),
+            _order_by: order_by,
+            _phantom: (PhantomData, PhantomData),
         }
     }
 
@@ -680,8 +680,8 @@ where
     {
         WithOrderBySelectedValueClause {
             statement: self,
-            order_by,
-            phantom: (PhantomData, PhantomData),
+            _order_by: order_by,
+            _phantom: (PhantomData, PhantomData),
         }
     }
 }

@@ -5,16 +5,15 @@ use gorm::{
     execution::DatabaseConnection,
     migration, returning, select_values, selected_value_to_order_by,
     sql::{
-        AddableSqlExpression, AverageableSqlExpression, BooleanAndableSqlExpression,
-        BooleanOrableSqlExpression, Insertable, Migration, MultipliableSqlExpression,
-        OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
+        AddableSqlExpression, BooleanAndableSqlExpression, BooleanOrableSqlExpression, Insertable,
+        Migration, MultipliableSqlExpression, OrderableSqlExpression, SqlExpression,
+        SummableSqlExpression, TableMarker,
     },
     statements::{
-        ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy, InnerJoinTrait,
-        LoadSingleColumnSqlStatment, LoadSqlStatment, OrderBy, OrderBySelectedValue, Returning,
-        SelectFrom, SelectStatement, SelectValues, WithWhereClause,
+        ExecuteSqlStatment, Filter, GroupBy, InnerJoinTrait, LoadSingleColumnSqlStatment,
+        LoadSqlStatment, OrderBy, OrderBySelectedValue, SelectFrom, SelectValues,
     },
-    Decimal, FromQueryResult, Table,
+    FromQueryResult, Table,
 };
 struct CreateTablesMigration;
 migration! {CreateTablesMigration => school, pet, person}

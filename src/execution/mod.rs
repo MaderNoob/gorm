@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tokio_postgres::types::{FromSql, FromSqlOwned};
+use tokio_postgres::types::FromSqlOwned;
 
 use crate::{error::*, sql::FromQueryResult, statements::SqlStatement};
 
@@ -9,7 +9,7 @@ pub use connection::*;
 
 /// An executor which can execute sql statements
 #[async_trait]
-pub trait SqlStatementExecutor: Sized {
+pub trait SqlStatementExecutor: Sized + Send + Sync{
     async fn execute(&self, statement: impl SqlStatement + Send) -> Result<ExecuteResult>;
 
     async fn load_one<O: FromQueryResult + Send, S: SqlStatement + Send>(

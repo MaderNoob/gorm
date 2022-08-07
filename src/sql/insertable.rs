@@ -6,7 +6,7 @@ use crate::{
     execution::{ExecuteResult, SqlStatementExecutor},
     statements::{
         ExecuteSqlStatment, InsertStatement, LoadSingleColumnSqlStatment, LoadSqlStatment,
-        ReturningInsertStatement, SqlStatement,
+        ReturningInsertStatement,
     },
     FromQueryResult, Table, TypedConsListNil, TypesNotEqual,
 };
@@ -33,14 +33,14 @@ pub trait Insertable: Sized {
     where
         's: 'a;
 
-    async fn insert(self, to: &(impl SqlStatementExecutor + Send + Sync)) -> Result<ExecuteResult> {
+    async fn insert(self, to: &impl SqlStatementExecutor) -> Result<ExecuteResult> {
         InsertStatement::new(self).execute(to).await
     }
 
     async fn insert_returning<O: FromQueryResult + Send>(
         self,
         returning: impl SelectedValues<Self::Table, Fields = O::Fields> + Send + 'static,
-        to: &(impl SqlStatementExecutor + Send + Sync),
+        to: &impl SqlStatementExecutor,
     ) -> Result<O>
     where
         (O::Fields, TypedConsListNil): TypesNotEqual,
@@ -60,7 +60,7 @@ pub trait Insertable: Sized {
             Fields = FieldsConsListCons<FieldName, FieldType, TypedConsListNil>,
         > + Send
         + 'static,
-        to: &(impl SqlStatementExecutor + Send + Sync),
+        to: &impl SqlStatementExecutor,
     ) -> Result<FieldType> {
         ReturningInsertStatement::new(self, returning)
             .load_one_value(to)
