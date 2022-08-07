@@ -8,9 +8,9 @@ mod migration;
 mod operators;
 mod selectable_tables;
 mod selected_values;
+mod sql_functions;
 mod table;
 mod types;
-mod sql_functions;
 
 pub use bound_parameters::ParameterBinder;
 pub use condition::*;
@@ -22,6 +22,6 @@ pub use migration::*;
 pub use operators::*;
 pub use selectable_tables::*;
 pub use selected_values::*;
+pub use sql_functions::*;
 pub use table::*;
 pub use types::*;
-pub use sql_functions::*;
