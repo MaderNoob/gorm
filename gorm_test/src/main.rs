@@ -1,4 +1,5 @@
 #![feature(associated_const_equality)]
+use std::borrow::Borrow;
 
 use gorm::{
     execution::DatabaseConnection,
@@ -10,12 +11,11 @@ use gorm::{
     },
     statements::{
         ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy, InnerJoinTrait,
-        LoadSqlStatment, OrderBy, OrderBySelectedValue, Returning, SelectFrom, SelectStatement,
-        SelectValues, WithWhereClause, LoadSingleColumnSqlStatment,
+        LoadSingleColumnSqlStatment, LoadSqlStatment, OrderBy, OrderBySelectedValue, Returning,
+        SelectFrom, SelectStatement, SelectValues, WithWhereClause,
     },
     Decimal, FromQueryResult, Table,
 };
-
 struct CreateTablesMigration;
 migration! {CreateTablesMigration => school, pet, person}
 
@@ -28,26 +28,21 @@ async fn main() {
     CreateTablesMigration::down(&client).await.unwrap();
     CreateTablesMigration::up(&client).await.unwrap();
 
-    school::new {
-        name: "mekif".to_string(),
-    }
-    .insert(&client)
-    .await
-    .unwrap();
+    school::new { name: "mekif" }.insert(&client).await.unwrap();
 
     let pet_id = pet::new_with_id {
-        name: "Kitty".to_string(),
-        id: 5,
+        name: "Kitty",
+        id: &5,
     }
     .insert_returning_value(returning!(pet::id), &client)
     .await
     .unwrap();
 
     person::new {
-        name: "James".to_string(),
-        age: 16,
-        school_id: 1,
-        pet_id: None,
+        name: "James",
+        age: &16,
+        school_id: &1,
+        pet_id: &None,
     }
     .insert(&client)
     .await
@@ -58,10 +53,10 @@ async fn main() {
         id: i32,
     }
     let new_person_info = person::new {
-        name: "Avi".to_string(),
-        age: 17,
-        school_id: 1,
-        pet_id: Some(pet_id),
+        name: "Avi",
+        age: &17,
+        school_id: &1,
+        pet_id: &Some(pet_id),
     }
     .insert_returning::<Person>(person::all, &client)
     .await
@@ -144,8 +139,31 @@ async fn main() {
 
     println!("{:?}", p);
 
-    let p = person::table.find().select(select_values!(person::name)).load_all_values(&client).await.unwrap();
+    let p = person::table
+        .find()
+        .select(select_values!(person::name))
+        .load_all_values(&client)
+        .await
+        .unwrap();
     println!("{:?}", p);
+
+    struct X<'id, 'name, 'age, Q1: ?Sized, Q2: ?Sized, Q3: ?Sized>
+    where
+        i32: Borrow<Q1>,
+        String: Borrow<Q2>,
+        i32: Borrow<Q3>,
+    {
+        id: &'id Q1,
+        name: &'name Q2,
+        age: &'age Q3,
+    }
+
+    let x = X {
+        id: &5,
+        name: "Hello",
+        age: &7,
+    };
+    // impl<Q1,Q2,Q3> X
 }
 
 #[derive(Debug, Table)]

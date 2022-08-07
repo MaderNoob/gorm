@@ -3,7 +3,7 @@ use darling::{ast::Fields, FromDeriveInput, FromField};
 use itertools::Itertools;
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Type};
+use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Lifetime, Type, Visibility};
 
 use crate::util::generate_fields_cons_list_type;
 
@@ -14,6 +14,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         ident: table_struct_ident,
         generics,
         data,
+        vis,
         table_name: optional_table_name,
     } = input;
 
@@ -45,6 +46,13 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         }
         .into();
     };
+
+    if !matches!(vis, Visibility::Public(_)) {
+        return quote_spanned! {
+            vis.span() => compile_error!("table struct must be public");
+        }
+        .into();
+    }
 
     let field_names = fields.iter().map(|field| &field.ident);
     let table_field_structs = fields
@@ -114,7 +122,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
          )*
 
         #[allow(non_camel_case_types)]
-        mod #table_name_ident {
+        pub mod #table_name_ident {
             #(
                 #column_structs
              )*
@@ -134,6 +142,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 struct TableInput {
     ident: proc_macro2::Ident,
     generics: syn::Generics,
+    vis: syn::Visibility,
     data: darling::ast::Data<(), TableInputField>,
     table_name: Option<String>,
 }
@@ -248,10 +257,12 @@ fn implement_insertables(
         .map(|field| (field.ident.as_ref().unwrap(), &field.ty))
         .collect();
 
-    let insertable_without_id = implement_insertable_with_fields("new", table_struct_ident, &fields_other_than_id);
-    let insertable_with_id = implement_insertable_with_fields("new_with_id", table_struct_ident, &all_fields);
+    let insertable_without_id =
+        implement_insertable_with_fields("new", table_struct_ident, &fields_other_than_id);
+    let insertable_with_id =
+        implement_insertable_with_fields("new_with_id", table_struct_ident, &all_fields);
 
-    quote!{
+    quote! {
         #insertable_without_id
 
         #insertable_with_id
@@ -263,39 +274,81 @@ fn implement_insertable_with_fields(
     table_struct_ident: &proc_macro2::Ident,
     fields: &[(&proc_macro2::Ident, &Type)],
 ) -> proc_macro2::TokenStream {
-    let insertable_struct_name_ident = proc_macro2::Ident::new(insertable_struct_name, proc_macro2::Span::call_site());
+    let insertable_struct_name_ident =
+        proc_macro2::Ident::new(insertable_struct_name, proc_macro2::Span::call_site());
 
-    let new_fields = fields.iter().map(|(ident, ty)| {
+    let new_fields = fields.iter().enumerate().map(|(i, (ident, _ty))| {
+        let borrow_generic_ident =
+            proc_macro2::Ident::new(&format!("Q{}", i), proc_macro2::Span::call_site());
+        let lifetime = Lifetime::new(&format!("'{}", ident), proc_macro2::Span::call_site());
         quote! {
-            pub #ident: #ty
+            pub #ident: &#lifetime #borrow_generic_ident
         }
     });
 
-    let value_names = fields
-        .iter()
-        .map(|(ident, _ty)| ident)
-        .join(",");
+    let value_names = fields.iter().map(|(ident, _ty)| ident).join(",");
 
-    let write_each_field_value = fields.iter().enumerate().map(
-        |(i, (ident, _ty))| {
-            let is_last_item = i + 1 == fields.len();
-            let format_string = if is_last_item { "{}" } else { "{}," };
+    let write_each_field_value = fields.iter().enumerate().map(|(i, (ident, _ty))| {
+        let is_last_item = i + 1 == fields.len();
+        let format_string = if is_last_item { "{}" } else { "{}," };
 
+        quote! {
+            ::std::write!(f, #format_string, parameter_binder.bind_parameter(&self.#ident))?;
+        }
+    });
+
+    let lifetimes = {
+        let lifetime_tokens_iter = fields.iter().map(|(ident, _ty)| {
+            Lifetime::new(&format!("'{}", ident), proc_macro2::Span::call_site())
+        });
+        quote! {
+            #(#lifetime_tokens_iter),*
+        }
+    };
+    let lifetimes_ref = &lifetimes;
+
+    let borrow_generics_definition = {
+        let idents = (0..fields.len())
+            .map(|i| proc_macro2::Ident::new(&format!("Q{}", i), proc_macro2::Span::call_site()));
+        quote! {
+            #(#idents),*
+        }
+    };
+    let borrow_generics_definition_ref = &borrow_generics_definition;
+
+    let where_clause_conditions = {
+        let conditions = fields.iter().enumerate().map(|(i, (ident, ty))| {
+            let generic_ident =
+                proc_macro2::Ident::new(&format!("Q{}", i), proc_macro2::Span::call_site());
+            let generic_ident_ref = &generic_ident;
+            let lifetime_token = Lifetime::new(&format!("'{}", ident), proc_macro2::Span::call_site());
             quote! {
-                ::std::write!(f, #format_string, parameter_binder.bind_parameter(&self.#ident))?;
+                #generic_ident_ref: ?::std::marker::Sized + ::std::marker::Send + ::std::marker::Sync,
+                &#lifetime_token #generic_ident_ref: ::gorm::tokio_postgres::types::ToSql,
+                #ty: ::std::borrow::Borrow<#generic_ident_ref>,
             }
-        },
-    );
+        });
+        quote! {
+            #(#conditions)*
+        }
+    };
+    let where_clause_conditions_ref = &where_clause_conditions;
 
     quote! {
         /// A struct which allows inserting new records into the table.
-        pub struct #insertable_struct_name_ident {
+        pub struct #insertable_struct_name_ident<#lifetimes_ref , #borrow_generics_definition_ref>
+        where
+            #where_clause_conditions_ref
+        {
             #(
                 #new_fields
             ),*
         }
 
-        impl ::gorm::sql::Insertable for #insertable_struct_name_ident {
+        impl<#lifetimes_ref , #borrow_generics_definition_ref> ::gorm::sql::Insertable for #insertable_struct_name_ident<#lifetimes_ref, #borrow_generics_definition_ref>
+        where
+            #where_clause_conditions_ref
+        {
             type Table = super::#table_struct_ident;
 
             fn write_value_names(
