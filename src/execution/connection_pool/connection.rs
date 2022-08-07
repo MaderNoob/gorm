@@ -1,44 +1,34 @@
 use async_trait::async_trait;
-use deadpool_postgres::tokio_postgres::{types::FromSqlOwned, Client, NoTls};
+use deadpool_postgres::{tokio_postgres::types::FromSqlOwned, Object};
 use futures::{pin_mut, TryStreamExt};
 
-use super::{transaction::DatabaseTransaction, SqlStatementExecutor};
-use crate::{error::*, execution::ExecuteResult, sql::FromQueryResult, statements::SqlStatement};
+use super::transaction::DatabaseTransactionFromPool;
+use crate::{
+    error::*,
+    execution::{ExecuteResult, SqlStatementExecutor},
+    statements::SqlStatement,
+    FromQueryResult,
+};
 
 /// An database connection.
-pub struct DatabaseConnection {
-    client: Client,
+pub struct DatabaseConnectionFromPool {
+    pub(super) client: Object,
 }
 
-impl DatabaseConnection {
-    /// Establish a new database connection to the given postgres connection
-    /// url.
-    pub async fn connect(url: &str) -> Result<Self> {
-        let (client, connection) = deadpool_postgres::tokio_postgres::connect(url, NoTls).await?;
-
-        // the connection must be awaited, run it in the background
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                panic!("database connection error: {}", e);
-            }
-        });
-
-        Ok(Self { client })
-    }
-
+impl DatabaseConnectionFromPool {
     /// Begins a transaction on this database connection.
     ///
     /// The transaction will roll back when dropped by default, use the `commit`
     /// method to commit it.
-    pub async fn begin_transaction(&mut self) -> Result<DatabaseTransaction> {
-        Ok(DatabaseTransaction {
+    pub async fn begin_transaction(&mut self) -> Result<DatabaseTransactionFromPool> {
+        Ok(DatabaseTransactionFromPool {
             transaction: self.client.transaction().await?,
         })
     }
 }
 
 #[async_trait]
-impl SqlStatementExecutor for DatabaseConnection {
+impl SqlStatementExecutor for DatabaseConnectionFromPool {
     async fn execute(
         &self,
         statement: impl crate::statements::SqlStatement + Send,

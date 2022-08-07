@@ -6,11 +6,11 @@ mod select;
 
 use async_trait::async_trait;
 pub use create_table::*;
+use deadpool_postgres::tokio_postgres::types::FromSqlOwned;
 pub use delete::*;
 pub use drop_table::*;
 pub use insert::*;
 pub use select::*;
-use tokio_postgres::types::FromSqlOwned;
 
 use crate::{
     error::*,
@@ -49,10 +49,7 @@ pub trait SqlStatement: Sized {
 #[async_trait]
 pub trait ExecuteSqlStatment: SqlStatement {
     /// Executes the query on the given executor
-    async fn execute(
-        self,
-        on: &impl SqlStatementExecutor,
-    ) -> Result<ExecuteResult> {
+    async fn execute(self, on: &impl SqlStatementExecutor) -> Result<ExecuteResult> {
         on.execute(self).await
     }
 }
@@ -107,10 +104,7 @@ pub trait LoadSingleColumnSqlStatment<
         on.load_optional_one_column(self).await
     }
 
-    async fn load_all_values(
-        self,
-        on: &impl SqlStatementExecutor,
-    ) -> Result<Vec<FieldType>> {
+    async fn load_all_values(self, on: &impl SqlStatementExecutor) -> Result<Vec<FieldType>> {
         on.load_all_one_column(self).await
     }
 }

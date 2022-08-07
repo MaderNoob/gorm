@@ -56,9 +56,7 @@ impl<I: Insertable, R: SelectedValues<I::Table>> ReturningInsertStatement<I, R> 
     }
 }
 
-impl<I: Insertable, R: SelectedValues<I::Table>> SqlStatement
-    for ReturningInsertStatement<I, R>
-{
+impl<I: Insertable, R: SelectedValues<I::Table>> SqlStatement for ReturningInsertStatement<I, R> {
     type OutputFields = R::Fields;
 
     fn write_sql_string<'s, 'a>(

@@ -1,4 +1,4 @@
-use tokio_postgres::types::ToSql;
+use deadpool_postgres::tokio_postgres::types::ToSql;
 
 /// A parameters binder which formats bound parameters as $1 .. $N.
 pub struct ParameterBinder<'a> {

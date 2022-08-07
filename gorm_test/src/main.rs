@@ -2,7 +2,7 @@
 use std::borrow::Borrow;
 
 use gorm::{
-    execution::DatabaseConnection,
+    execution::{DatabaseConnection, DatabaseConnectionPool},
     migration, returning, select_values, selected_value_to_order_by,
     sql::{
         AddableSqlExpression, BooleanAndableSqlExpression, BooleanOrableSqlExpression, Insertable,
@@ -20,20 +20,29 @@ migration! {CreateTablesMigration => school, pet, person}
 
 #[tokio::main]
 async fn main() {
-    let client = DatabaseConnection::connect("postgres://postgres:postgres@localhost/gorm_test")
+    let pool = DatabaseConnectionPool::connect("postgres://postgres:postgres@localhost/gorm_test")
         .await
         .unwrap();
 
-    CreateTablesMigration::down(&client).await.unwrap();
-    CreateTablesMigration::up(&client).await.unwrap();
 
-    school::new { name: "mekif" }.insert(&client).await.unwrap();
+    {
+
+        let mut client = pool.get().await.unwrap();
+        let transaction = client.begin_transaction().await.unwrap();
+
+        CreateTablesMigration::down(&pool).await.unwrap();
+        CreateTablesMigration::up(&transaction).await.unwrap();
+
+        transaction.commit().await.unwrap();
+    }
+
+    school::new { name: "mekif" }.insert(&pool).await.unwrap();
 
     let pet_id = pet::new_with_id {
         name: "Kitty",
         id: &5,
     }
-    .insert_returning_value(returning!(pet::id), &client)
+    .insert_returning_value(returning!(pet::id), &pool)
     .await
     .unwrap();
 
@@ -43,7 +52,7 @@ async fn main() {
         school_id: &1,
         pet_id: &None,
     }
-    .insert(&client)
+    .insert(&pool)
     .await
     .unwrap();
 
@@ -57,7 +66,7 @@ async fn main() {
         school_id: &1,
         pet_id: &Some(pet_id),
     }
-    .insert_returning::<Person>(person::all, &client)
+    .insert_returning::<Person>(person::all, &pool)
     .await
     .unwrap();
 
@@ -67,7 +76,7 @@ async fn main() {
     //     .delete()
     //     .filter(person::id.lower_than(10))
     //     .returning(returning!(person::id))
-    //     .load_all_values(&client)
+    //     .load_all_values(&pool)
     //     .await
     //     .unwrap();
     // println!("deleted people: {:?}", deleted_people_ids);
@@ -88,7 +97,7 @@ async fn main() {
         )
         .select(select_values!(person::name, school::name as school_name))
         .order_by_ascending(person::name)
-        .load_all::<PersonNameAndSchoolName>(&client)
+        .load_all::<PersonNameAndSchoolName>(&pool)
         .await
         .unwrap();
 
@@ -107,7 +116,7 @@ async fn main() {
         .filter(person::age.greater_than(0))
         .group_by(person::school_id.add(person::id))
         .order_by_selected_value_descending(selected_value_to_order_by!(avg_age))
-        .load_all::<PeopleAvgAge>(&client)
+        .load_all::<PeopleAvgAge>(&pool)
         .await
         .unwrap();
 
@@ -116,7 +125,7 @@ async fn main() {
     let people = person::table
         .find()
         .select(person::all)
-        .load_all::<Person>(&client)
+        .load_all::<Person>(&pool)
         .await
         .unwrap();
 
@@ -132,7 +141,7 @@ async fn main() {
         .inner_join(pet::table)
         .find()
         .select(select_values!(person::name, pet::name as pet_name))
-        .load_all::<PersonAndPetName>(&client)
+        .load_all::<PersonAndPetName>(&pool)
         .await
         .unwrap();
 
@@ -141,28 +150,10 @@ async fn main() {
     let p = person::table
         .find()
         .select(select_values!(person::name))
-        .load_all_values(&client)
+        .load_all_values(&pool)
         .await
         .unwrap();
     println!("{:?}", p);
-
-    struct X<'id, 'name, 'age, Q1: ?Sized, Q2: ?Sized, Q3: ?Sized>
-    where
-        i32: Borrow<Q1>,
-        String: Borrow<Q2>,
-        i32: Borrow<Q3>,
-    {
-        id: &'id Q1,
-        name: &'name Q2,
-        age: &'age Q3,
-    }
-
-    let x = X {
-        id: &5,
-        name: "Hello",
-        age: &7,
-    };
-    // impl<Q1,Q2,Q3> X
 }
 
 #[derive(Debug, Table)]

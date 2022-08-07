@@ -23,6 +23,7 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
                 .create()
                 .execute(executor)
                 .map(map_result_to_unit_type)
+                .await?;
         }
     });
 
@@ -36,6 +37,7 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
                 .if_exists()
                 .execute(executor)
                 .map(map_result_to_unit_type)
+                .await?;
         }
     });
 
@@ -47,9 +49,8 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
 
                 #map_result_to_unit_type_fn_definition_ref
 
-                ::gorm::futures::future::try_join_all([
-                    #(#create_tables),*
-                ]).await?;
+                #(#create_tables)*
+
                 Ok(())
             }
 
@@ -58,9 +59,8 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
 
                 #map_result_to_unit_type_fn_definition_ref
 
-                ::gorm::futures::future::try_join_all([
-                    #(#drop_tables),*
-                ]).await?;
+                #(#drop_tables)*
+
                 Ok(())
             }
         }

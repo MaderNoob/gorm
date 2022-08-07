@@ -1,15 +1,19 @@
 use async_trait::async_trait;
-use tokio_postgres::types::FromSqlOwned;
+use deadpool_postgres::tokio_postgres::types::FromSqlOwned;
 
 use crate::{error::*, sql::FromQueryResult, statements::SqlStatement};
 
-pub mod connection;
+mod connection;
+mod connection_pool;
+mod transaction;
 
 pub use connection::*;
+pub use connection_pool::*;
+pub use transaction::*;
 
 /// An executor which can execute sql statements
 #[async_trait]
-pub trait SqlStatementExecutor: Sized + Send + Sync{
+pub trait SqlStatementExecutor: Sized + Send + Sync {
     async fn execute(&self, statement: impl SqlStatement + Send) -> Result<ExecuteResult>;
 
     async fn load_one<O: FromQueryResult + Send, S: SqlStatement + Send>(

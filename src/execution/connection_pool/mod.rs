@@ -1,51 +1,56 @@
-use async_trait::async_trait;
-use deadpool_postgres::tokio_postgres::{types::FromSqlOwned, Client, NoTls};
-use futures::{pin_mut, TryStreamExt};
+mod connection;
+mod transaction;
 
-use super::{transaction::DatabaseTransaction, SqlStatementExecutor};
+use async_trait::async_trait;
+pub use connection::*;
+use deadpool_postgres::{
+    tokio_postgres::{types::FromSqlOwned, NoTls},
+    Manager, ManagerConfig, Pool,
+};
+use futures::{pin_mut, TryStreamExt};
+pub use transaction::*;
+
+use super::SqlStatementExecutor;
 use crate::{error::*, execution::ExecuteResult, sql::FromQueryResult, statements::SqlStatement};
 
 /// An database connection.
-pub struct DatabaseConnection {
-    client: Client,
+pub struct DatabaseConnectionPool {
+    pool: Pool,
 }
 
-impl DatabaseConnection {
-    /// Establish a new database connection to the given postgres connection
+impl DatabaseConnectionPool {
+    /// Create a new database connection pool with the given postgres connection
     /// url.
     pub async fn connect(url: &str) -> Result<Self> {
-        let (client, connection) = deadpool_postgres::tokio_postgres::connect(url, NoTls).await?;
+        let tokio_postgres_config: deadpool_postgres::tokio_postgres::Config = url.parse()?;
+        let manager = Manager::from_config(
+            tokio_postgres_config,
+            NoTls,
+            ManagerConfig {
+                recycling_method: deadpool_postgres::RecyclingMethod::Fast,
+            },
+        );
+        let pool = Pool::builder(manager).build()?;
 
-        // the connection must be awaited, run it in the background
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                panic!("database connection error: {}", e);
-            }
-        });
-
-        Ok(Self { client })
+        Ok(Self { pool })
     }
 
-    /// Begins a transaction on this database connection.
-    ///
-    /// The transaction will roll back when dropped by default, use the `commit`
-    /// method to commit it.
-    pub async fn begin_transaction(&mut self) -> Result<DatabaseTransaction> {
-        Ok(DatabaseTransaction {
-            transaction: self.client.transaction().await?,
-        })
+    /// Returns a single connection from the connection pool.
+    pub async fn get(&self) -> Result<DatabaseConnectionFromPool> {
+        let client = self.pool.get().await?;
+        Ok(DatabaseConnectionFromPool { client })
     }
 }
 
 #[async_trait]
-impl SqlStatementExecutor for DatabaseConnection {
+impl SqlStatementExecutor for DatabaseConnectionPool {
     async fn execute(
         &self,
         statement: impl crate::statements::SqlStatement + Send,
     ) -> Result<ExecuteResult> {
+        let client = self.pool.get().await?;
         let (query_string, parameter_binder) = statement.build();
-        let rows_modified = self
-            .client
+        let rows_modified = client
             .execute(&query_string, parameter_binder.parameters())
             .await?;
 
@@ -56,9 +61,9 @@ impl SqlStatementExecutor for DatabaseConnection {
         &self,
         statement: S,
     ) -> Result<O> {
+        let client = self.pool.get().await?;
         let (query_string, parameter_binder) = statement.build();
-        let row_stream = self
-            .client
+        let row_stream = client
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -75,9 +80,9 @@ impl SqlStatementExecutor for DatabaseConnection {
         &self,
         statement: S,
     ) -> Result<O> {
+        let client = self.pool.get().await?;
         let (query_string, parameter_binder) = statement.build();
-        let row_stream = self
-            .client
+        let row_stream = client
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -94,9 +99,9 @@ impl SqlStatementExecutor for DatabaseConnection {
         &self,
         statement: S,
     ) -> Result<Option<O>> {
+        let client = self.pool.get().await?;
         let (query_string, parameter_binder) = statement.build();
-        let row_stream = self
-            .client
+        let row_stream = client
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -113,9 +118,9 @@ impl SqlStatementExecutor for DatabaseConnection {
         &self,
         statement: S,
     ) -> Result<Option<O>> {
+        let client = self.pool.get().await?;
         let (query_string, parameter_binder) = statement.build();
-        let row_stream = self
-            .client
+        let row_stream = client
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -132,9 +137,9 @@ impl SqlStatementExecutor for DatabaseConnection {
         &self,
         statement: S,
     ) -> Result<Vec<O>> {
+        let client = self.pool.get().await?;
         let (query_string, parameter_binder) = statement.build();
-        let row_stream = self
-            .client
+        let row_stream = client
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -151,9 +156,9 @@ impl SqlStatementExecutor for DatabaseConnection {
         &self,
         statement: S,
     ) -> Result<Vec<O>> {
+        let client = self.pool.get().await?;
         let (query_string, parameter_binder) = statement.build();
-        let row_stream = self
-            .client
+        let row_stream = client
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 

@@ -1,4 +1,4 @@
-use tokio_postgres::types::FromSqlOwned;
+use deadpool_postgres::tokio_postgres::types::FromSqlOwned;
 
 use super::{FieldNameCharsConsListItem, FieldsConsListCons, ParameterBinder, SelectedValues};
 use crate::{

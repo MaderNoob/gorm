@@ -1,51 +1,32 @@
 use async_trait::async_trait;
-use deadpool_postgres::tokio_postgres::{types::FromSqlOwned, Client, NoTls};
+use deadpool_postgres::{tokio_postgres::types::FromSqlOwned, Transaction};
 use futures::{pin_mut, TryStreamExt};
 
-use super::{transaction::DatabaseTransaction, SqlStatementExecutor};
+use super::SqlStatementExecutor;
 use crate::{error::*, execution::ExecuteResult, sql::FromQueryResult, statements::SqlStatement};
 
 /// An database connection.
-pub struct DatabaseConnection {
-    client: Client,
+pub struct DatabaseTransactionFromPool<'a> {
+    pub(super) transaction: Transaction<'a>,
 }
 
-impl DatabaseConnection {
-    /// Establish a new database connection to the given postgres connection
-    /// url.
-    pub async fn connect(url: &str) -> Result<Self> {
-        let (client, connection) = deadpool_postgres::tokio_postgres::connect(url, NoTls).await?;
-
-        // the connection must be awaited, run it in the background
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                panic!("database connection error: {}", e);
-            }
-        });
-
-        Ok(Self { client })
-    }
-
-    /// Begins a transaction on this database connection.
-    ///
-    /// The transaction will roll back when dropped by default, use the `commit`
-    /// method to commit it.
-    pub async fn begin_transaction(&mut self) -> Result<DatabaseTransaction> {
-        Ok(DatabaseTransaction {
-            transaction: self.client.transaction().await?,
-        })
+impl<'a> DatabaseTransactionFromPool<'a> {
+    /// Commits the transaction to the database.
+    pub async fn commit(self) -> Result<()> {
+        self.transaction.commit().await?;
+        Ok(())
     }
 }
 
 #[async_trait]
-impl SqlStatementExecutor for DatabaseConnection {
+impl<'a> SqlStatementExecutor for DatabaseTransactionFromPool<'a> {
     async fn execute(
         &self,
         statement: impl crate::statements::SqlStatement + Send,
     ) -> Result<ExecuteResult> {
         let (query_string, parameter_binder) = statement.build();
         let rows_modified = self
-            .client
+            .transaction
             .execute(&query_string, parameter_binder.parameters())
             .await?;
 
@@ -58,7 +39,7 @@ impl SqlStatementExecutor for DatabaseConnection {
     ) -> Result<O> {
         let (query_string, parameter_binder) = statement.build();
         let row_stream = self
-            .client
+            .transaction
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -77,7 +58,7 @@ impl SqlStatementExecutor for DatabaseConnection {
     ) -> Result<O> {
         let (query_string, parameter_binder) = statement.build();
         let row_stream = self
-            .client
+            .transaction
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -96,7 +77,7 @@ impl SqlStatementExecutor for DatabaseConnection {
     ) -> Result<Option<O>> {
         let (query_string, parameter_binder) = statement.build();
         let row_stream = self
-            .client
+            .transaction
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -115,7 +96,7 @@ impl SqlStatementExecutor for DatabaseConnection {
     ) -> Result<Option<O>> {
         let (query_string, parameter_binder) = statement.build();
         let row_stream = self
-            .client
+            .transaction
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -134,7 +115,7 @@ impl SqlStatementExecutor for DatabaseConnection {
     ) -> Result<Vec<O>> {
         let (query_string, parameter_binder) = statement.build();
         let row_stream = self
-            .client
+            .transaction
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
@@ -153,7 +134,7 @@ impl SqlStatementExecutor for DatabaseConnection {
     ) -> Result<Vec<O>> {
         let (query_string, parameter_binder) = statement.build();
         let row_stream = self
-            .client
+            .transaction
             .query_raw(&query_string, parameter_binder.parameters().iter().copied())
             .await?;
 
