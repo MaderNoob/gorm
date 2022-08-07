@@ -35,8 +35,9 @@ async fn main() {
     .await
     .unwrap();
 
-    let pet_id = pet::new {
+    let pet_id = pet::new_with_id {
         name: "Kitty".to_string(),
+        id: 5,
     }
     .insert_returning_value(returning!(pet::id), &client)
     .await

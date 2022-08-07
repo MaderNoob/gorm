@@ -77,7 +77,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         ))
     });
 
-    let insertable = implement_insertable(&table_struct_ident, &fields);
+    let insertable = implement_insertables(&table_struct_ident, &fields);
 
     let all_fields_selected_struct =
         implement_all_fields_selected_struct(&fields_type, &table_struct_ident, &table_name);
@@ -233,7 +233,7 @@ fn generate_foreign_key_impl(
     }
 }
 
-fn implement_insertable(
+fn implement_insertables(
     table_struct_ident: &proc_macro2::Ident,
     fields: &Fields<TableInputField>,
 ) -> proc_macro2::TokenStream {
@@ -243,20 +243,42 @@ fn implement_insertable(
         .filter(|(ident, _ty)| ident.to_string() != "id")
         .collect();
 
-    let new_fields = fields_other_than_id.iter().map(|(ident, ty)| {
+    let all_fields: Vec<_> = fields
+        .iter()
+        .map(|field| (field.ident.as_ref().unwrap(), &field.ty))
+        .collect();
+
+    let insertable_without_id = implement_insertable_with_fields("new", table_struct_ident, &fields_other_than_id);
+    let insertable_with_id = implement_insertable_with_fields("new_with_id", table_struct_ident, &all_fields);
+
+    quote!{
+        #insertable_without_id
+
+        #insertable_with_id
+    }
+}
+
+fn implement_insertable_with_fields(
+    insertable_struct_name: &str,
+    table_struct_ident: &proc_macro2::Ident,
+    fields: &[(&proc_macro2::Ident, &Type)],
+) -> proc_macro2::TokenStream {
+    let insertable_struct_name_ident = proc_macro2::Ident::new(insertable_struct_name, proc_macro2::Span::call_site());
+
+    let new_fields = fields.iter().map(|(ident, ty)| {
         quote! {
             pub #ident: #ty
         }
     });
 
-    let value_names = fields_other_than_id
+    let value_names = fields
         .iter()
         .map(|(ident, _ty)| ident)
         .join(",");
 
-    let write_each_field_value = fields_other_than_id.iter().enumerate().map(
+    let write_each_field_value = fields.iter().enumerate().map(
         |(i, (ident, _ty))| {
-            let is_last_item = i + 1 == fields_other_than_id.len();
+            let is_last_item = i + 1 == fields.len();
             let format_string = if is_last_item { "{}" } else { "{}," };
 
             quote! {
@@ -267,13 +289,13 @@ fn implement_insertable(
 
     quote! {
         /// A struct which allows inserting new records into the table.
-        pub struct new {
+        pub struct #insertable_struct_name_ident {
             #(
                 #new_fields
             ),*
         }
 
-        impl ::gorm::sql::Insertable for new {
+        impl ::gorm::sql::Insertable for #insertable_struct_name_ident {
             type Table = super::#table_struct_ident;
 
             fn write_value_names(
