@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// An sql statement which can be executed by a database.
-pub trait SqlStatement: Sized + 'static {
+pub trait SqlStatement: Sized {
     /// The fields of the output of this statement.
     type OutputFields: FieldsConsListItem;
 

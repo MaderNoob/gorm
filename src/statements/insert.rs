@@ -19,7 +19,7 @@ impl<I: Insertable> InsertStatement<I> {
     }
 }
 
-impl<I: Insertable + 'static> SqlStatement for InsertStatement<I> {
+impl<I: Insertable> SqlStatement for InsertStatement<I> {
     type OutputFields = TypedConsListNil;
 
     fn write_sql_string<'s, 'a>(
@@ -56,7 +56,7 @@ impl<I: Insertable, R: SelectedValues<I::Table>> ReturningInsertStatement<I, R> 
     }
 }
 
-impl<I: Insertable + 'static, R: SelectedValues<I::Table> + 'static> SqlStatement
+impl<I: Insertable, R: SelectedValues<I::Table>> SqlStatement
     for ReturningInsertStatement<I, R>
 {
     type OutputFields = R::Fields;

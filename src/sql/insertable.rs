@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[async_trait::async_trait]
-pub trait Insertable: Sized + 'static {
+pub trait Insertable: Sized {
     type Table: Table;
 
     /// Writes the names of the values inserted by this insertable.
