@@ -5,8 +5,8 @@ use gorm::{
     execution::{DatabaseConnection, DatabaseConnectionPool},
     migration, returning, select_values, selected_value_to_order_by,
     sql::{
-        AddableSqlExpression, BooleanAndableSqlExpression, BooleanOrableSqlExpression, Insertable,
-        Migration, MultipliableSqlExpression, OrderableSqlExpression, SqlExpression,
+        self, AddableSqlExpression, BooleanAndableSqlExpression, BooleanOrableSqlExpression,
+        Insertable, Migration, MultipliableSqlExpression, OrderableSqlExpression, SqlExpression,
         SummableSqlExpression, TableMarker,
     },
     statements::{
@@ -24,9 +24,7 @@ async fn main() {
         .await
         .unwrap();
 
-
     {
-
         let mut client = pool.get().await.unwrap();
         let transaction = client.begin_transaction().await.unwrap();
 
@@ -154,6 +152,15 @@ async fn main() {
         .await
         .unwrap();
     println!("{:?}", p);
+
+    let count = person::table
+        .find()
+        .select(select_values!(sql::count_rows() as count))
+        .load_one_value(&pool)
+        .await
+        .unwrap();
+
+    println!("count: {}", count);
 }
 
 #[derive(Debug, Table)]

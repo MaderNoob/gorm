@@ -7,6 +7,26 @@ use crate::sql::{
     SqlNumeric, SqlType, SummableSqlType,
 };
 
+pub struct SqlCountRows;
+
+impl<S: SelectableTables> SqlExpression<S> for SqlCountRows {
+    type RustType = i64;
+    type SqlType = SqlI64;
+
+    const IS_AGGREGATE: bool = true;
+
+    fn write_sql_string<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        _parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        write!(f, "COUNT(*)")
+    }
+}
+
 pub struct SqlCount<S: SelectableTables, E: SqlExpression<S>> {
     expr: E,
     phantom: PhantomData<S>,

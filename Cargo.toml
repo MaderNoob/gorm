@@ -19,3 +19,4 @@ futures = "0.3.21"
 tokio = { version = "1.20.0", features = ["rt"] }
 rust_decimal = { version = "1.25.0", features = ["db-tokio-postgres"] }
 deadpool-postgres = "0.10.2"
+
