@@ -1,3 +1,5 @@
+//! Sql logic encoded in rust's type system.
+
 mod bound_parameters;
 mod condition;
 mod expr;

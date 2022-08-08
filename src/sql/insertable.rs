@@ -3,7 +3,7 @@ use deadpool_postgres::tokio_postgres::types::FromSqlOwned;
 use super::{FieldNameCharsConsListItem, FieldsConsListCons, ParameterBinder, SelectedValues};
 use crate::{
     error::*,
-    execution::{ExecuteResult, SqlStatementExecutor},
+    execution::SqlStatementExecutor,
     statements::{
         ExecuteSqlStatment, InsertStatement, LoadSingleColumnSqlStatment, LoadSqlStatment,
         ReturningInsertStatement,
@@ -11,6 +11,7 @@ use crate::{
     FromQueryResult, Table, TypedConsListNil, TypesNotEqual,
 };
 
+/// A record type which can be inserted into the database.
 #[async_trait::async_trait]
 pub trait Insertable: Sized {
     type Table: Table;
@@ -33,10 +34,18 @@ pub trait Insertable: Sized {
     where
         's: 'a;
 
-    async fn insert(self, to: &impl SqlStatementExecutor) -> Result<ExecuteResult> {
-        InsertStatement::new(self).execute(to).await
+    /// Inserts this record into the database.
+    async fn insert(self, to: &impl SqlStatementExecutor) -> Result<()> {
+        InsertStatement::new(self).execute(to).await?;
+
+        Ok(())
     }
 
+    /// Inserts this record into the database, returning the selected values.
+    ///
+    /// The values can be selected using the [`returning!`] macro.
+    ///
+    /// [`returning!`]: crate::returning
     async fn insert_returning<O: FromQueryResult + Send>(
         self,
         returning: impl SelectedValues<Self::Table, Fields = O::Fields> + Send + 'static,
@@ -50,6 +59,12 @@ pub trait Insertable: Sized {
             .await
     }
 
+
+    /// Inserts this record into the database, returning a single selected value.
+    ///
+    /// The value can be selected using the [`returning!`] macro.
+    ///
+    /// [`returning!`]: crate::returning
     async fn insert_returning_value<
         FieldName: FieldNameCharsConsListItem,
         FieldType: FromSqlOwned + Send,

@@ -1,7 +1,10 @@
 use rust_decimal::Decimal;
 
+use crate::{TypedBool, TypedFalse, TypedTrue, TypesEqual};
+
 /// An sql type.
 pub trait SqlType {
+    /// The rust type of this sql type.
     type RustType: IntoSqlType<SqlType = Self>;
 
     /// If `Self` is an `SqlOption`, then this type will contain the type inside
@@ -10,15 +13,23 @@ pub trait SqlType {
     /// This is used to allow foreign keys with optional types.
     type NonNullSqlType: SqlType;
 
+    /// Is this type nullable.
+    type IsNull: TypedBool;
+
+    /// The sql string representation of this type.
     const SQL_NAME: &'static str;
-    const IS_NULL: bool;
 }
 
 /// An sql serial type.
 pub trait SqlSerialType {
+    /// The rust type of this sql serial type.
     type RustType: IntoSqlSerialType<SqlSerialType = Self>;
+
+    /// The sql string representation of this type.
     const SQL_NAME: &'static str;
-    const IS_NULL: bool;
+
+    /// Is this type nullable.
+    type IsNull: TypedBool;
 }
 
 /// A trait used to convert a rust type to its sql type.
@@ -39,8 +50,8 @@ macro_rules! define_generic_sql_type {
         impl SqlType for $sql_type_name{
             type RustType = $rust_type;
             type NonNullSqlType = Self;
+            type IsNull = TypedFalse;
             const SQL_NAME:&'static str = $sql_name;
-            const IS_NULL:bool = false;
         }
         impl IntoSqlType for $rust_type {
             type SqlType = $sql_type_name;
@@ -60,8 +71,8 @@ macro_rules! define_sql_type {
         pub struct $sql_serial_type_name;
         impl SqlSerialType for $sql_serial_type_name{
             type RustType = $serial_rust_type;
+            type IsNull = TypedFalse;
             const SQL_NAME:&'static str = $serial_sql_name;
-            const IS_NULL:bool = false;
         }
         impl IntoSqlSerialType for $serial_rust_type {
             type SqlSerialType = $sql_serial_type_name;
@@ -85,18 +96,30 @@ impl<'a> IntoSqlType for &'a str {
     type SqlType = SqlText;
 }
 
-pub struct SqlOption<T: SqlType>(T);
-impl<T: SqlType> SqlType for SqlOption<T> {
+/// A wrapper around a non-nullable sql type which makes it nullable.
+pub struct SqlOption<T: SqlType>(T)
+where
+    (T::IsNull, TypedFalse): TypesEqual;
+
+impl<T: SqlType> SqlType for SqlOption<T>
+where
+    (T::IsNull, TypedFalse): TypesEqual,
+{
+    type IsNull = TypedTrue;
     type NonNullSqlType = T;
     type RustType = Option<T::RustType>;
 
-    const IS_NULL: bool = true;
     const SQL_NAME: &'static str = T::SQL_NAME;
 }
-impl<T: IntoSqlType> IntoSqlType for Option<T> {
+impl<T: IntoSqlType> IntoSqlType for Option<T>
+where
+    (<T::SqlType as SqlType>::IsNull, TypedFalse): TypesEqual,
+{
     type SqlType = SqlOption<T::SqlType>;
 }
 
+/// An sql type which can be ordered, which means it can be compared with other values of the same
+/// type.
 pub trait OrderableSqlType {}
 
 macro_rules! mark_sql_types {
@@ -109,10 +132,14 @@ macro_rules! mark_sql_types {
 
 mark_sql_types! {OrderableSqlType => SqlI16, SqlI32, SqlI64, SqlF32, SqlF64, SqlNumeric, Serial16, Serial32, Serial64, SqlText}
 
+/// An sql type which can be averaged, which means that we can find the average of multiple values
+/// of this type.
 pub trait AverageableSqlType {
     type OutputSqlType: SqlType;
 }
 
+/// An sql type which can be summed, which means that we can find the sum of multiple values
+/// of this type.
 pub trait SummableSqlType: SqlAdd<Self> + Sized {
     type OutputSqlType: SqlType;
 }
@@ -161,9 +188,16 @@ macro_rules! mark_sql_types_with_rhs {
     };
 }
 
+/// A marker trait which represents that a value of type `Rhs` can be added to a value of type `Self`.
 pub trait SqlAdd<Rhs> {}
+
+/// A marker trait which represents that a value of type `Rhs` can be subtracted from a value of type `Self`.
 pub trait SqlSubtract<Rhs> {}
+
+/// A marker trait which represents that a value of type `Self` can be multiplied by a value of type `Rhs`.
 pub trait SqlMultiply<Rhs> {}
+
+/// A marker trait which represents that a value of type `Self` can be divided by a value of type `Rhs`.
 pub trait SqlDivide<Rhs> {}
 
 macro_rules! mark_all_number_types_with_rhs {

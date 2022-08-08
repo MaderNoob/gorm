@@ -170,7 +170,7 @@ impl TableInputField {
             }
         };
         let sql_type_name = quote! { #as_sql_type_trait::SQL_NAME };
-        let is_null = quote! { #as_sql_type_trait::IS_NULL };
+        let is_null = quote! { <#as_sql_type_trait::IsNull as ::gorm::TypedBool>::VALUE };
 
         let foreign_key_to_table_name = match &self.foreign_key {
             Some(foreign_key_table_struct_name) => {

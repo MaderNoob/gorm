@@ -11,11 +11,15 @@ use crate::sql::{
     SqlConditionLowerThan, SqlConditionNotEq, SqlText, SqlType, Table,
 };
 
-/// An sql expression
+/// An sql expression.
 pub trait SqlExpression<S: SelectableTables>: Sized {
+    /// The sql type of this sql expresion.
     type SqlType: SqlType;
+
+    /// The rust type of this sql expression.
     type RustType: IntoSqlType<SqlType = Self::SqlType>;
 
+    /// Is this sql expression an aggregate expression?
     const IS_AGGREGATE: bool;
 
     /// Writes the sql expression as an sql string which can be evaluated by the
@@ -71,7 +75,7 @@ pub trait SqlExpression<S: SelectableTables>: Sized {
     }
 }
 
-// a column is an sql expression
+// A column is an sql expression.
 impl<S: SelectableTables, C: Column> SqlExpression<S> for C
 where
     S: SelectableTablesContains<<C as Column>::Table>,
@@ -98,13 +102,15 @@ where
     }
 }
 
+/// An sql expression which can be ordered, which means that it can be compared
+/// to other sql expressions with the same sql type.
 pub trait OrderableSqlExpression<S: SelectableTables>: SqlExpression<S>
 where
     Self::SqlType: OrderableSqlType,
 {
     /// Returns a condition which will be true if this expression is lower than
     /// the given one.
-    // only allow comparing with expression with the same value type
+    // Only allow comparing with expression with the same value type
     fn lower_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
@@ -114,7 +120,7 @@ where
 
     /// Returns a condition which will be true if this expression is lower or
     /// equal to the given one.
-    // only allow comparing with expression with the same value type
+    // Only allow comparing with expression with the same value type
     fn lower_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
@@ -124,7 +130,7 @@ where
 
     /// Returns a condition which will be true if this expression is greater
     /// than the given one.
-    // only allow comparing with expression with the same value type
+    // Only allow comparing with expression with the same value type
     fn greater_than<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
@@ -134,7 +140,7 @@ where
 
     /// Returns a condition which will be true if this expression is greater or
     /// equal to the given one.
-    // only allow comparing with expression with the same value type
+    // Only allow comparing with expression with the same value type
     fn greater_equals<O: SqlExpression<S, SqlType = <Self as SqlExpression<S>>::SqlType>>(
         self,
         other: O,
@@ -142,7 +148,7 @@ where
         SqlConditionGreaterEquals::new(self, other)
     }
 
-    /// Returns an expression which evaluates to the max item of the items
+    /// Returns an expression which evaluates to the max value of the values
     /// returned from the query.
     fn max(self) -> SqlMax<S, Self> {
         SqlMax::new(self)
@@ -153,6 +159,8 @@ impl<S: SelectableTables, T: SqlExpression<S>> OrderableSqlExpression<S> for T w
 {
 }
 
+
+/// An sql expression which is averageable, which means that we can find the average value of it.
 pub trait AverageableSqlExpression<S: SelectableTables>: SqlExpression<S>
 where
     Self::SqlType: AverageableSqlType,
@@ -168,6 +176,7 @@ impl<S: SelectableTables, E: SqlExpression<S>> AverageableSqlExpression<S> for E
 {
 }
 
+/// An sql expression which is summable, which means that we can sum the values of it.
 pub trait SummableSqlExpression<S: SelectableTables>: SqlExpression<S>
 where
     Self::SqlType: SummableSqlType,

@@ -2,10 +2,12 @@ use std::marker::PhantomData;
 
 use crate::{sql::Table, util::TypesNotEqual};
 
-/// A list of tables from which columns can be used in an sql expression.
+/// A typed cons list of tables from which columns can be used in an sql
+/// expression.
 pub trait SelectableTables {}
 
-/// A marker traits which indicates that a list of tables contains some table.
+/// A marker trait which indicates that a list of selectable tables contains
+/// some table.
 pub trait SelectableTablesContains<T: Table>: SelectableTables {}
 
 /// A cons item in the selectable tables cons list.
@@ -15,7 +17,7 @@ pub struct SelectableTablesCons<T: Table, N: SelectableTables>(PhantomData<T>, P
 impl<T: Table> SelectableTables for T {}
 impl<T: Table> SelectableTablesContains<T> for T {}
 
-// a cons list item is a `SelectableTables`
+// a cons item is a `SelectableTables`
 impl<T: Table, N: SelectableTables> SelectableTables for SelectableTablesCons<T, N> {}
 
 // a cons list item contains the Table it holds, and everything else that its
@@ -29,7 +31,7 @@ where
 {
 }
 
-/// A trait used to combine 2 selectable tables.
+/// A trait used to combine 2 selectable tables types.
 pub trait CombineSelectableTables<CombineWith: SelectableTables> {
     type Combined: SelectableTables;
 }
@@ -40,6 +42,9 @@ impl<T: Table + SelectableTables, CombineWith: SelectableTables>
     type Combined = SelectableTablesCons<T, CombineWith>;
 }
 
+/// A type alias which represents the result of combining 2 types which
+/// implement the [`SelectableTables`] trait into a single type which implements
+/// that trait.
 pub type CombinedSelectableTables<A, B> = <A as CombineSelectableTables<B>>::Combined;
 
 impl<
