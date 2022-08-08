@@ -2,19 +2,6 @@ use std::{fmt::Write, marker::PhantomData};
 
 use crate::sql::{OrderableSqlType, ParameterBinder, SelectableTables, SqlBool, SqlExpression};
 
-/// An sql condition, which is basically an sql expression with a boolean value.
-pub trait SqlCondition<S: SelectableTables> {
-    /// Writes the condition as an sql string which can be used in a where
-    /// clause.
-    fn write_sql_string<'s, 'a>(
-        &'s self,
-        f: &mut String,
-        parameter_binder: &mut ParameterBinder<'a>,
-    ) -> std::fmt::Result
-    where
-        's: 'a;
-}
-
 /// Defines an operator condition struct.
 macro_rules! define_operator_condition{
     {$type_name: ident, $operator: tt} => {
@@ -36,24 +23,6 @@ macro_rules! define_operator_condition{
             }
         }
 
-        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> SqlCondition<S>
-            for $type_name<S, Lhs, Rhs>
-        {
-            fn write_sql_string<'s, 'a>(
-                &'s self,
-                f: &mut String,
-                parameter_binder: &mut ParameterBinder<'a>,
-            ) -> std::fmt::Result
-            where
-                's: 'a,
-            {
-                self.lhs.write_sql_string(f, parameter_binder)?;
-                write!(f, stringify!($operator))?;
-                self.rhs.write_sql_string(f, parameter_binder)?;
-                Ok(())
-            }
-        }
-
         impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> SqlExpression<S>
             for $type_name<S, Lhs, Rhs>
         {
@@ -70,7 +39,10 @@ macro_rules! define_operator_condition{
             where
                 's: 'a,
             {
-                <Self as SqlCondition<S>>::write_sql_string(self, f, parameter_binder)
+                self.lhs.write_sql_string(f, parameter_binder)?;
+                write!(f, stringify!($operator))?;
+                self.rhs.write_sql_string(f, parameter_binder)?;
+                Ok(())
             }
         }
     }
@@ -104,26 +76,6 @@ macro_rules! define_operator_condition_orderable{
             }
         }
 
-        impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> SqlCondition<S>
-            for $type_name<S, Lhs, Rhs>
-        where
-            Lhs::SqlType: OrderableSqlType
-        {
-            fn write_sql_string<'s, 'a>(
-                &'s self,
-                f: &mut String,
-                parameter_binder: &mut ParameterBinder<'a>,
-            ) -> std::fmt::Result
-            where
-                's: 'a,
-            {
-                self.lhs.write_sql_string(f, parameter_binder)?;
-                write!(f, stringify!($operator))?;
-                self.rhs.write_sql_string(f, parameter_binder)?;
-                Ok(())
-            }
-        }
-
         impl<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> SqlExpression<S>
             for $type_name<S, Lhs, Rhs>
         where
@@ -142,7 +94,10 @@ macro_rules! define_operator_condition_orderable{
             where
                 's: 'a,
             {
-                <Self as SqlCondition<S>>::write_sql_string(self, f, parameter_binder)
+                self.lhs.write_sql_string(f, parameter_binder)?;
+                write!(f, stringify!($operator))?;
+                self.rhs.write_sql_string(f, parameter_binder)?;
+                Ok(())
             }
         }
     }

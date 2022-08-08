@@ -1,6 +1,6 @@
 use std::{fmt::Write, marker::PhantomData};
 
-use crate::sql::{ParameterBinder, SelectableTables, SqlBool, SqlCondition, SqlExpression};
+use crate::sql::{ParameterBinder, SelectableTables, SqlBool, SqlExpression};
 
 macro_rules! define_boolean_operator{
     {$type_name: ident, $operator: tt} => {
@@ -43,21 +43,6 @@ macro_rules! define_boolean_operator{
                 write!(f, " {} ", stringify!($operator))?;
                 self.rhs.write_parenthesized_sql_string(f, parameter_binder)?;
                 Ok(())
-            }
-        }
-
-        impl<S: SelectableTables, Lhs: SqlExpression<S, SqlType = SqlBool>, Rhs: SqlExpression<S, SqlType = SqlBool>> SqlCondition<S>
-            for $type_name<S, Lhs, Rhs>
-        {
-            fn write_sql_string<'s, 'a>(
-                &'s self,
-                f: &mut String,
-                parameter_binder: &mut ParameterBinder<'a>,
-            ) -> std::fmt::Result
-            where
-                's: 'a
-            {
-                <Self as SqlExpression<S>>::write_sql_string(self, f, parameter_binder)
             }
         }
     }

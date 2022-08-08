@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use super::SqlStatement;
 use crate::{
-    sql::{FieldsConsListItem, ParameterBinder, SelectedValues, SqlCondition},
+    sql::{FieldsConsListItem, ParameterBinder, SelectedValues, SqlExpression, SqlBool},
     Table, TypedBool, TypedConsListNil, TypedFalse, TypedTrue,
 };
 
@@ -131,13 +131,13 @@ impl<T: Table> SqlStatement for EmptyDeleteStatement<T> {
 /// [`FilterDeleteStatement::filter`] function.
 pub struct DeleteWithWhereClause<
     S: DeleteStatement<HasWhereClause = TypedFalse>,
-    C: SqlCondition<S::DeleteFrom>,
+    C: SqlExpression<S::DeleteFrom, SqlType = SqlBool>,
 > {
     statement: S,
     condition: C,
 }
 
-impl<S: DeleteStatement<HasWhereClause = TypedFalse>, C: SqlCondition<S::DeleteFrom>>
+impl<S: DeleteStatement<HasWhereClause = TypedFalse>, C: SqlExpression<S::DeleteFrom, SqlType = SqlBool>>
     DeleteStatement for DeleteWithWhereClause<S, C>
 {
     type DeleteFrom = S::DeleteFrom;
@@ -173,7 +173,7 @@ impl<S: DeleteStatement<HasWhereClause = TypedFalse>, C: SqlCondition<S::DeleteF
 
 impl<
     S: DeleteStatement<HasWhereClause = TypedFalse> + 'static,
-    C: SqlCondition<S::DeleteFrom> + 'static,
+    C: SqlExpression<S::DeleteFrom, SqlType = SqlBool> + 'static,
 > SqlStatement for DeleteWithWhereClause<S, C>
 {
     impl_sql_statement_for_delete_statement! {}
@@ -184,7 +184,7 @@ impl<
 pub trait FilterDeleteStatement: DeleteStatement<HasWhereClause = TypedFalse> {
     /// Filters this delete statement, so that it only deletes records which
     /// match the given condition.
-    fn filter<C: SqlCondition<Self::DeleteFrom>>(
+    fn filter<C: SqlExpression<Self::DeleteFrom, SqlType = SqlBool>>(
         self,
         condition: C,
     ) -> DeleteWithWhereClause<Self, C> {

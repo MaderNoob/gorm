@@ -5,8 +5,8 @@ use crate::{
     sql::{
         Column, CombineSelectableTables, CombinedSelectableTables, FieldNameCharsConsListItem,
         FieldsConsListItem, HasForeignKey, ParameterBinder, SelectableTables, SelectedValues,
-        SelectedValuesContainsFieldWithName, SqlCondition, SqlExpression, SqlType, Table,
-        TableMarker,
+        SelectedValuesContainsFieldWithName, SqlExpression, SqlType, Table,
+        TableMarker, SqlBool,
     },
     TypedBool, TypedFalse, TypedTrue, TypesEqual,
 };
@@ -306,7 +306,7 @@ impl<T: SelectStatement<HasSelectedValues = TypedFalse>> SelectValues for T {}
 pub struct WithWhereClause<
     S: SelectFrom,
     T: SelectStatement<HasWhereClause = TypedFalse>,
-    C: SqlCondition<S::SelectableTables>,
+    C: SqlExpression<S::SelectableTables, SqlType = SqlBool>,
 > {
     statement: T,
     condition: C,
@@ -315,7 +315,7 @@ pub struct WithWhereClause<
 impl<
     S: SelectFrom + 'static,
     T: SelectStatement<HasWhereClause = TypedFalse>,
-    C: SqlCondition<S::SelectableTables> + 'static,
+    C: SqlExpression<S::SelectableTables, SqlType = SqlBool> + 'static,
 > SelectStatement for WithWhereClause<S, T, C>
 {
     type HasGroupByClause = T::HasGroupByClause;
@@ -375,7 +375,7 @@ impl<
 impl<
     S: SelectFrom + 'static,
     T: SelectStatement<HasWhereClause = TypedFalse>,
-    C: SqlCondition<S::SelectableTables> + 'static,
+    C: SqlExpression<S::SelectableTables, SqlType = SqlBool> + 'static,
 > SqlStatement for WithWhereClause<S, T, C>
 {
     impl_sql_statement_for_select_statement! {}
@@ -386,7 +386,7 @@ impl<
 pub trait Filter: SelectStatement<HasWhereClause = TypedFalse> {
     /// Filters this select statement, so that it only returns records which
     /// match the given condition.
-    fn filter<C: SqlCondition<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
+    fn filter<C: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables, SqlType = SqlBool>>(
         self,
         condition: C,
     ) -> WithWhereClause<Self::SelectFrom, Self, C> {
