@@ -2,7 +2,7 @@ use std::{fmt::Write, marker::PhantomData};
 
 use crate::sql::{OrderableSqlType, ParameterBinder, SelectableTables, SqlBool, SqlExpression};
 
-/// A condition in a where clause.
+/// An sql condition, which is basically an sql expression with a boolean value.
 pub trait SqlCondition<S: SelectableTables> {
     /// Writes the condition as an sql string which can be used in a where
     /// clause.
@@ -15,6 +15,7 @@ pub trait SqlCondition<S: SelectableTables> {
         's: 'a;
 }
 
+/// Defines an operator condition struct.
 macro_rules! define_operator_condition{
     {$type_name: ident, $operator: tt} => {
         pub struct $type_name<S: SelectableTables, Lhs: SqlExpression<S>, Rhs: SqlExpression<S, SqlType = Lhs::SqlType>> {
