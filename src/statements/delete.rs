@@ -6,13 +6,22 @@ use crate::{
     Table, TypedBool, TypedConsListNil, TypedFalse, TypedTrue,
 };
 
+/// Represents any type of sql delete statement.
 pub trait DeleteStatement: Sized {
+    /// A type identifying the output fields of this delete statement, selected
+    /// in its `RETURNING` clause.
     type OutputFields: FieldsConsListItem;
+
+    /// The table that this statement deletes from.
     type DeleteFrom: Table;
 
+    /// Does this delete statement have a `WHERE` clause?
     type HasWhereClause: TypedBool;
+
+    /// Does this delete statement have a `RETURNING` clause?
     type HasReturningClause: TypedBool;
 
+    /// Writes the `WHERE` clause of this delete statement.
     fn write_where_clause<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -21,6 +30,7 @@ pub trait DeleteStatement: Sized {
     where
         's: 'a;
 
+    /// Writes the `RETURNING` clause of this delete statement.
     fn write_returning_clause<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -29,6 +39,7 @@ pub trait DeleteStatement: Sized {
     where
         's: 'a;
 
+    /// Writes this delete statement as an sql string.
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -49,6 +60,8 @@ pub trait DeleteStatement: Sized {
     }
 }
 
+/// Implements the [`SqlStatement`] trait for some type which implements
+/// [`DeleteStatement`]
 macro_rules! impl_sql_statement_for_delete_statement {
     {} => {
         type OutputFields = <Self as DeleteStatement>::OutputFields;
@@ -66,9 +79,14 @@ macro_rules! impl_sql_statement_for_delete_statement {
     };
 }
 
-/// An sql delete statement
+/// An sql delete statement which deletes all records from the table.
+///
+/// This statement can be created by calling the [`TableMarker::delete`]
+/// function.
 pub struct EmptyDeleteStatement<T: Table>(PhantomData<T>);
 impl<T: Table> EmptyDeleteStatement<T> {
+    /// Creates a new sql delete statement which deletes all records from the
+    /// table
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -107,6 +125,10 @@ impl<T: Table> SqlStatement for EmptyDeleteStatement<T> {
     impl_sql_statement_for_delete_statement! {}
 }
 
+/// A wrapper around an sql delete statement which adds a `WHERE` clause to it.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`FilterDeleteStatement::filter`] function.
 pub struct DeleteWithWhereClause<
     S: DeleteStatement<HasWhereClause = TypedFalse>,
     C: SqlCondition<S::DeleteFrom>,
@@ -157,7 +179,11 @@ impl<
     impl_sql_statement_for_delete_statement! {}
 }
 
+/// A trait which allows filtering a delete statement so that it only deletes
+/// records matching some condition.
 pub trait FilterDeleteStatement: DeleteStatement<HasWhereClause = TypedFalse> {
+    /// Filters this delete statement, so that it only deletes records which
+    /// match the given condition.
     fn filter<C: SqlCondition<Self::DeleteFrom>>(
         self,
         condition: C,
@@ -171,6 +197,11 @@ pub trait FilterDeleteStatement: DeleteStatement<HasWhereClause = TypedFalse> {
 
 impl<T: DeleteStatement<HasWhereClause = TypedFalse>> FilterDeleteStatement for T {}
 
+/// A wrapper around an sql delete statement which adds a `RETURNING` clause to
+/// it.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`Returning::returning`] function.
 pub struct WithReturningClause<
     S: DeleteStatement<HasReturningClause = TypedFalse>,
     R: SelectedValues<S::DeleteFrom>,
@@ -221,7 +252,14 @@ impl<
     impl_sql_statement_for_delete_statement! {}
 }
 
+/// A trait which allows returning some values from the records deleted by some
+/// delete statement.
 pub trait Returning: DeleteStatement<HasReturningClause = TypedFalse> {
+    /// Selects some values to be returned from the records deleted by this
+    /// delete statement. To provide a list of values to be returned, use the
+    /// [`returning!`] macro.
+    ///
+    /// [`returning!`]: gorm::returning
     fn returning<R: SelectedValues<Self::DeleteFrom>>(
         self,
         returning: R,

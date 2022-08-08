@@ -4,13 +4,18 @@ use crate::{
     Table, TypedConsListNil,
 };
 
-/// An sql insert statement
+/// An sql insert statement.
+///
+/// This statement shouldn't be used directly, you should instead use the
+/// [`Insertable::insert`] function.
 pub struct InsertStatement<I: Insertable>(I);
 impl<I: Insertable> InsertStatement<I> {
+    /// Creates a new sql insert statement which inserts the given insertable.
     pub fn new(insertable: I) -> Self {
         Self(insertable)
     }
 
+    /// Selects some values to be returned from this insert statement.
     pub fn returning<R: SelectedValues<I::Table>>(
         self,
         returning: R,
@@ -42,12 +47,18 @@ impl<I: Insertable> SqlStatement for InsertStatement<I> {
     }
 }
 
+/// An sql insert statement with a returning clause.
+///
+/// This statement shouldn't be used directly, you should instead use the
+/// [`Insertable::insert_returning`] function.
 pub struct ReturningInsertStatement<I: Insertable, R: SelectedValues<I::Table>> {
     insertable: I,
     returning: R,
 }
 
 impl<I: Insertable, R: SelectedValues<I::Table>> ReturningInsertStatement<I, R> {
+    /// Creates a new sql insert statement which inserts the given insertable and returns the given
+    /// selected values.
     pub fn new(insertable: I, returning: R) -> Self {
         Self {
             insertable,

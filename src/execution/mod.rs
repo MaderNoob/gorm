@@ -29,7 +29,7 @@ pub trait SqlStatementExecutor: Sized + Send + Sync {
     /// Executes the given sql statement.
     async fn execute(&self, statement: impl SqlStatement + Send) -> Result<ExecuteResult>;
 
-    /// Executes the given sql statement and loads the first returned row from
+    /// Executes the given sql statement and loads the first returned record from
     /// it.
     async fn load_one<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
@@ -61,7 +61,7 @@ pub trait SqlStatementExecutor: Sized + Send + Sync {
     // >: SqlStatement<OutputFields = FieldsConsListCons<FieldName, FieldType,
     // TypedConsListNil>>
 
-    /// Executes the given sql statement and loads the first returned row from
+    /// Executes the given sql statement and loads the first returned record from
     /// it, if any.
     async fn load_optional<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
@@ -87,7 +87,7 @@ pub trait SqlStatementExecutor: Sized + Send + Sync {
         statement: S,
     ) -> Result<Option<FieldType>>;
 
-    /// Executes the given sql statement and loads all the rows returned from
+    /// Executes the given sql statement and loads all the records returned from
     /// it.
     async fn load_all<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,

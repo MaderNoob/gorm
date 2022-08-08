@@ -7,8 +7,12 @@ use crate::{
 };
 
 /// An sql drop table statement
+///
+/// This statement can be created by calling the [`TableMarker::drop`]
+/// function.
 pub struct DropTableStatement<T: Table>(PhantomData<T>);
 impl<T: Table> DropTableStatement<T> {
+    /// Creates a new sql drop table statement.
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -33,7 +37,12 @@ impl<T: Table> SqlStatement for DropTableStatement<T> {
     }
 }
 
-/// An sql drop table if exists statement
+/// An sql drop table if exists statement.
+///
+/// This statement doesn't return an error in case the table does not exist.
+///
+/// This statement can be created by calling the [`DropTableStatement::if_exists`]
+/// function.
 pub struct DropTableIfExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for DropTableIfExistsStatement<T> {
     type OutputFields = TypedConsListNil;

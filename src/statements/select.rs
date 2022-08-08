@@ -11,33 +11,51 @@ use crate::{
     TypedBool, TypedFalse, TypedTrue, TypesEqual,
 };
 
+/// Represents any type of sql select statement.
 pub trait SelectStatement: SqlStatement {
+    /// A type identifying the output fields of this select statement.
     type OutputFields: FieldsConsListItem;
+
+    /// The source from which records are being selected.
     type SelectFrom: SelectFrom;
 
-    /// This is used for allowing ordering by a value that was selected using
-    /// `select_values!`. In order to check that the value is actually in
-    /// the list of selected values we need a reference to the
-    /// `SelectedValues` because it implements the
-    /// `SelectedValuesContainsFieldWithName` trait which allows checking if it
-    /// contains a field with a given name.
+    /// The selected values in this select statement.
     ///
-    /// We can't put a constraint on this type to implement `SelectedValues`
-    /// because that would require adding a generic to the `SelectStatement`
-    /// trait, which will break some other stuff. Also, there won't be an
-    /// easy placeholder to use if we constrained it.
-    ///
-    /// So we just don't constrain it, and for types that don't have custom
-    /// values it will be `()` or whatever else, and for types that have
-    /// custom values it would implement `SelectedValues`, that way we could
-    /// implement something only when this implements `SelectedValues`.
+    /// For select statement which don't have custom selected values, this will
+    /// be `()`, otherwise it will be some type implementing the
+    /// [`SelectedValues`] trait.
+    // This is used for allowing ordering by a value that was selected using
+    // `select_values!`. In order to check that the value is actually in
+    // the list of selected values we need a reference to the
+    // `SelectedValues` because it implements the
+    // `SelectedValuesContainsFieldWithName` trait which allows checking if it
+    // contains a field with a given name.
+    //
+    // We can't put a constraint on this type to implement `SelectedValues`
+    // because that would require adding a generic to the `SelectStatement`
+    // trait, which will break some other stuff. Also, there won't be an
+    // easy placeholder to use if we constrained it.
+    //
+    // So we just don't constrain it, and for types that don't have custom
+    // values it will be `()` or whatever else, and for types that have
+    // custom values it would implement `SelectedValues`, that way we could
+    // implement something only when this implements `SelectedValues`.
     type SelectedValues;
 
+    /// Does this select statement have custom selected values?
     type HasSelectedValues: TypedBool;
+
+    /// Does this select statement have a `WHERE` clause?
     type HasWhereClause: TypedBool;
+
+    /// Does this select statement have a `GROUP BY` clause?
     type HasGroupByClause: TypedBool;
+
+    /// Does this select statement have a `ORDER BY` clause?
     type HasOrderByClause: TypedBool;
 
+    /// Writes the custom selected values which are selected by this select
+    /// statement.
     fn write_selected_values<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -46,6 +64,7 @@ pub trait SelectStatement: SqlStatement {
     where
         's: 'a;
 
+    /// Writes the `WHERE` clause of this select statement.
     fn write_where_clause<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -54,6 +73,7 @@ pub trait SelectStatement: SqlStatement {
     where
         's: 'a;
 
+    /// Writes the `GROUP BY` clause of this select statement.
     fn write_group_by_clause<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -62,6 +82,7 @@ pub trait SelectStatement: SqlStatement {
     where
         's: 'a;
 
+    /// Writes the `ORDER BY` clause of this select statement.
     fn write_order_by_clause<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -70,6 +91,7 @@ pub trait SelectStatement: SqlStatement {
     where
         's: 'a;
 
+    /// Writes this select statement as an sql string.
     fn write_sql_string<'s, 'a>(
         &'s self,
         f: &mut String,
@@ -88,6 +110,8 @@ pub trait SelectStatement: SqlStatement {
     }
 }
 
+/// Implements the [`SqlStatement`] trait for some type which implements
+/// [`SelectStatement`]
 macro_rules! impl_sql_statement_for_select_statement {
     {} => {
         type OutputFields = <Self as SelectStatement>::OutputFields;
@@ -105,13 +129,16 @@ macro_rules! impl_sql_statement_for_select_statement {
     };
 }
 
-/// An sql statement for finding records in a table
+/// An sql select statement which loads all records from some table.
+///
+/// This statement can be created by calling the [`SelectFrom::find`] function.
 pub struct EmptySelectStatement<S: SelectFrom>(PhantomData<S>);
 impl<S: SelectFrom> EmptySelectStatement<S> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
+
 impl<S: SelectFrom + 'static> SelectStatement for EmptySelectStatement<S> {
     type HasGroupByClause = TypedFalse;
     type HasOrderByClause = TypedFalse;
@@ -170,6 +197,11 @@ impl<S: SelectFrom + 'static> SqlStatement for EmptySelectStatement<S> {
     impl_sql_statement_for_select_statement! {}
 }
 
+/// A wrapper around an sql select statement which selects custom values from
+/// it. for it.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`SelectValues::select`] function.
 pub struct WithSelectedValues<
     S: SelectFrom,
     T: SelectStatement<HasSelectedValues = TypedFalse>,
@@ -179,6 +211,7 @@ pub struct WithSelectedValues<
     values: V,
     phantom: PhantomData<S>,
 }
+
 impl<
     S: SelectFrom + 'static,
     T: SelectStatement<HasSelectedValues = TypedFalse>,
@@ -247,7 +280,12 @@ impl<
     impl_sql_statement_for_select_statement! {}
 }
 
+/// A trait which allows selecting custom values from an sql select statement.
 pub trait SelectValues: SelectStatement<HasSelectedValues = TypedFalse> {
+    /// Selects custom values from this select statement. To provide a list of
+    /// selected values use the [`select_values!`] macro.
+    ///
+    /// [`select_values!`]: crate::select_values
     fn select<V: SelectedValues<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
         self,
         values: V,
@@ -261,6 +299,10 @@ pub trait SelectValues: SelectStatement<HasSelectedValues = TypedFalse> {
 }
 impl<T: SelectStatement<HasSelectedValues = TypedFalse>> SelectValues for T {}
 
+/// A wrapper around an sql select statement which adds a `WHERE` clause to it.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`Filter::filter`] function.
 pub struct WithWhereClause<
     S: SelectFrom,
     T: SelectStatement<HasWhereClause = TypedFalse>,
@@ -339,7 +381,11 @@ impl<
     impl_sql_statement_for_select_statement! {}
 }
 
+/// A trait which allows filtering a select statement so that it only selects
+/// records matching some condition.
 pub trait Filter: SelectStatement<HasWhereClause = TypedFalse> {
+    /// Filters this select statement, so that it only returns records which
+    /// match the given condition.
     fn filter<C: SqlCondition<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
         self,
         condition: C,
@@ -353,6 +399,11 @@ pub trait Filter: SelectStatement<HasWhereClause = TypedFalse> {
 }
 impl<T: SelectStatement<HasWhereClause = TypedFalse>> Filter for T {}
 
+/// A wrapper around an sql select statement which adds a `GROUP BY` clause to
+/// it.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`GroupBy::group_by`] function.
 pub struct WithGroupByClause<
     S: SelectFrom,
     T: SelectStatement<HasGroupByClause = TypedFalse>,
@@ -431,7 +482,11 @@ impl<
     impl_sql_statement_for_select_statement! {}
 }
 
+/// A trait which allows grouping the results of a select statement which uses
+/// aggregate functions by some expression.
 pub trait GroupBy: SelectStatement<HasGroupByClause = TypedFalse> {
+    /// Groups the results of this select statement which uses aggregate
+    /// functions by the given expression.
     fn group_by<G: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
         self,
         group_by: G,
@@ -445,24 +500,36 @@ pub trait GroupBy: SelectStatement<HasGroupByClause = TypedFalse> {
 }
 impl<T: SelectStatement<HasGroupByClause = TypedFalse>> GroupBy for T {}
 
-pub trait Order {
+/// An ordering, used in an `ORDER BY` clause.
+pub trait Ordering {
+    /// The sql string which should be appended at the end of the `ORDER BY`
+    /// clause for this ordering to be applied.
     const ORDER_STR: &'static str;
 }
+
+/// Order the results of a query in ascending order.
 pub struct AscendingOrder;
-impl Order for AscendingOrder {
+impl Ordering for AscendingOrder {
     const ORDER_STR: &'static str = "";
 }
+
+/// Order the results of a query in descending order.
 pub struct DescendingOrder;
-impl Order for DescendingOrder {
+impl Ordering for DescendingOrder {
     const ORDER_STR: &'static str = " DESC";
 }
-pub trait CanOrderBy<S: SelectFrom, T: SelectStatement<HasOrderByClause = TypedFalse>> {}
 
+/// A wrapper around an sql select statement which adds an `ORDER BY` clause to
+/// it and orders it by some expression.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`OrderBy::order_by_ascending`] and [`OrderBy::order_by_descending`]
+/// functions.
 pub struct WithOrderByClause<
     S: SelectFrom,
     T: SelectStatement<HasOrderByClause = TypedFalse>,
     B: SqlExpression<S::SelectableTables>,
-    O: Order,
+    O: Ordering,
 > {
     statement: T,
     order_by: B,
@@ -472,7 +539,7 @@ impl<
     S: SelectFrom + 'static,
     T: SelectStatement<HasOrderByClause = TypedFalse>,
     B: SqlExpression<S::SelectableTables> + 'static,
-    O: Order + 'static,
+    O: Ordering + 'static,
 > SelectStatement for WithOrderByClause<S, T, B, O>
 {
     type HasGroupByClause = T::HasGroupByClause;
@@ -534,13 +601,17 @@ impl<
     S: SelectFrom + 'static,
     T: SelectStatement<HasOrderByClause = TypedFalse>,
     B: SqlExpression<S::SelectableTables> + 'static,
-    O: Order + 'static,
+    O: Ordering + 'static,
 > SqlStatement for WithOrderByClause<S, T, B, O>
 {
     impl_sql_statement_for_select_statement! {}
 }
 
+/// A trait which allows ordering the results of a select statement by some
+/// expression in an ascending or descending order.
 pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
+    /// Orders the results of this select statement by the given expression in
+    /// an ascending order.
     fn order_by_ascending<B: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
         self,
         order_by: B,
@@ -552,6 +623,8 @@ pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
         }
     }
 
+    /// Orders the results of this select statement by the given expression in
+    /// an descending order.
     fn order_by_descending<B: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables>>(
         self,
         order_by: B,
@@ -565,18 +638,29 @@ pub trait OrderBy: SelectStatement<HasOrderByClause = TypedFalse> {
 }
 impl<T: SelectStatement<HasOrderByClause = TypedFalse>> OrderBy for T {}
 
-/// A selected value which is used to order by
+/// A selected value which is used to order by.
 pub trait SelectedValueToOrderBy {
+    /// A type used to identify the name of this selected value in the list of
+    /// selected values.
     type Name: FieldNameCharsConsListItem;
 
+    /// The name of this selected value as a string.
     const NAME_STR: &'static str;
 }
 
+/// A wrapper around an sql select statement which adds an `ORDER BY` clause to
+/// it and orders it by some value which is in the list of custom selected
+/// values.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`OrderBySelectedValue::order_by_selected_value_ascending`] and
+/// [`OrderBySelectedValue::order_by_selected_value_descending`]
+/// functions.
 pub struct WithOrderBySelectedValueClause<
     S: SelectFrom,
     T: SelectStatement<HasOrderByClause = TypedFalse>,
     B: SelectedValueToOrderBy,
-    O: Order,
+    O: Ordering,
 > {
     statement: T,
     _order_by: B,
@@ -586,7 +670,7 @@ impl<
     S: SelectFrom + 'static,
     T: SelectStatement<HasOrderByClause = TypedFalse>,
     B: SelectedValueToOrderBy + 'static,
-    O: Order + 'static,
+    O: Ordering + 'static,
 > SelectStatement for WithOrderBySelectedValueClause<S, T, B, O>
 {
     type HasGroupByClause = T::HasGroupByClause;
@@ -646,17 +730,26 @@ impl<
     S: SelectFrom + 'static,
     T: SelectStatement<HasOrderByClause = TypedFalse>,
     B: SelectedValueToOrderBy + 'static,
-    O: Order + 'static,
+    O: Ordering + 'static,
 > SqlStatement for WithOrderBySelectedValueClause<S, T, B, O>
 {
     impl_sql_statement_for_select_statement! {}
 }
 
+/// A trait which allows ordering the results of a select statement by some
+/// value which is in the list of custom selected values of this statement in an
+/// ascending or descending order.
 pub trait OrderBySelectedValue<S: SelectableTables>:
     SelectStatement<HasOrderByClause = TypedFalse>
 where
     Self::SelectedValues: SelectedValues<S>,
 {
+    /// Orders the results of this select statement in an ascending order by the
+    /// given value from the list of custom selected values of this statment.
+    /// To provide a value to this function you should use the
+    /// [`selected_value_to_order_by!`] macro
+    ///
+    /// [`selected_value_to_order_by!`]: crate::selected_value_to_order_by
     fn order_by_selected_value_ascending<B: SelectedValueToOrderBy>(
         self,
         order_by: B,
@@ -671,6 +764,12 @@ where
         }
     }
 
+    /// Orders the results of this select statement in an descending order by
+    /// the given value from the list of custom selected values of this
+    /// statment. To provide a value to this function you should use the
+    /// [`selected_value_to_order_by!`] macro
+    ///
+    /// [`selected_value_to_order_by!`]: crate::selected_value_to_order_by
     fn order_by_selected_value_descending<B: SelectedValueToOrderBy>(
         self,
         order_by: B,
@@ -692,11 +791,17 @@ where
 {
 }
 
-/// Something which you can select from.
-/// This can be a table or multiple joined tables.
+/// Some source which you can select from.
+///
+/// This can be a table or multiple tables joined together.
 pub trait SelectFrom: Sized {
+    /// The tables from which columns can be selected in a statement which
+    /// selects values from this source.
     type SelectableTables: SelectableTables;
 
+    /// The left-most table of this source.
+    /// This is the table whose values will be selected by default in cause of
+    /// inner joined tables.
     type LeftMostTable: Table;
 
     /// Writes the `from` part of the sql query as an sql string.
@@ -714,6 +819,7 @@ pub trait SelectFrom: Sized {
     }
 }
 
+// We can select records from a table.
 impl<T: TableMarker> SelectFrom for T {
     type LeftMostTable = T::Table;
     type SelectableTables = T::Table;
@@ -727,12 +833,27 @@ impl<T: TableMarker> SelectFrom for T {
     }
 }
 
-pub struct InnerJoined<A: SelectFrom, B: SelectFrom>(PhantomData<A>, PhantomData<B>);
-impl<A: SelectFrom, B: SelectFrom> InnerJoined<A, B> {
+/// Represents the inner join of 2 selection sources.
+pub struct InnerJoined<A: SelectFrom, B: SelectFrom>(PhantomData<A>, PhantomData<B>)
+where
+    A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
+    A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
+    (<<<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual;
+
+impl<A: SelectFrom, B: SelectFrom> InnerJoined<A, B> 
+where
+    A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
+    A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
+    (<<<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
+{
+    /// Creates a new source which represents the inner join of 2 selection sources.
     pub fn new() -> Self {
         Self(PhantomData, PhantomData)
     }
 }
+
+// We can select from an inner joined source if there is a foreign key constraint using which we
+// can join the 2 sources.
 impl<A: SelectFrom, B: SelectFrom> SelectFrom for InnerJoined<A, B>
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
@@ -761,12 +882,15 @@ where
     }
 }
 
+/// A trait which allows inner joining 2 selection sources using foreign keys.
 pub trait InnerJoinTrait: Sized + SelectFrom {
-    /// Inner joins this table with another table
+    /// Inner joins this selection source with another selection source, if this source has a
+    /// foreign key to the other one.
     fn inner_join<S: SelectFrom>(self, _with: S) -> InnerJoined<Self, S>
     where
         Self::LeftMostTable: HasForeignKey<S::LeftMostTable>,
-    (<<<Self::LeftMostTable as HasForeignKey<S::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<S::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
+        <Self as SelectFrom>::SelectableTables: CombineSelectableTables<<S as SelectFrom>::SelectableTables>,
+        (<<<Self::LeftMostTable as HasForeignKey<S::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<S::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
     {
         InnerJoined::new()
     }

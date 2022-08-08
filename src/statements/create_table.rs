@@ -7,13 +7,18 @@ use crate::{
 };
 
 /// An sql create table statement
+///
+/// This statement can be created by calling the [`TableMarker::create`]
+/// function.
 pub struct CreateTableStatement<T: Table>(PhantomData<T>);
 impl<T: Table> CreateTableStatement<T> {
+    /// Creates a new sql create table statement.
     pub fn new() -> Self {
         Self(PhantomData)
     }
 
-    /// Do not throw an error if a table with that name already exists.
+    /// Only create the table if a table with such a name doesn't already exist,
+    /// and if such a table already exists, do nothing.
     pub fn if_not_exists(self) -> CreateTableIfNotExistsStatement<T> {
         CreateTableIfNotExistsStatement(PhantomData)
     }
@@ -30,16 +35,21 @@ impl<T: Table> SqlStatement for CreateTableStatement<T> {
     where
         's: 'a,
     {
-        write!(
-            f,
-            "CREATE TABLE {} ({})",
-            T::TABLE_NAME,
-            generate_create_table_columns_sql_string(T::FIELDS)
-        )
+        write!(f, "CREATE TABLE {} (", T::TABLE_NAME,)?;
+        generate_create_table_columns_sql_string(T::FIELDS, f);
+        f.push(')');
+
+        Ok(())
     }
 }
 
-/// An sql create table if not exists statement
+/// An sql create table if not exists statement.
+///
+/// This statement only creates the table if a table with such a name doesn't
+/// already exist, otherwise it does nothing.
+///
+/// This statement can be created by calling the
+/// [`CreateTableStatement::if_not_exists`] function.
 pub struct CreateTableIfNotExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
     type OutputFields = TypedConsListNil;
@@ -52,41 +62,42 @@ impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
     where
         's: 'a,
     {
-        write!(
-            f,
-            "CREATE TABLE IF NOT EXISTS {} ({})",
-            T::TABLE_NAME,
-            generate_create_table_columns_sql_string(T::FIELDS)
-        )
+        write!(f, "CREATE TABLE IF NOT EXISTS {} (", T::TABLE_NAME,)?;
+        generate_create_table_columns_sql_string(T::FIELDS, f);
+        f.push(')');
+
+        Ok(())
     }
 }
 
-fn generate_create_table_columns_sql_string(fields: &[TableField]) -> String {
-    let mut fields_string = String::new();
+/// Converts the fields of the table to an sql string representing the columns
+/// of the table.
+fn generate_create_table_columns_sql_string(
+    fields: &[TableField],
+    write_fields_string_into: &mut String,
+) {
     for field_info in fields {
-        fields_string.push_str(field_info.name);
-        fields_string.push(' ');
-        fields_string.push_str(field_info.sql_type_name);
+        write_fields_string_into.push_str(field_info.name);
+        write_fields_string_into.push(' ');
+        write_fields_string_into.push_str(field_info.sql_type_name);
         if field_info.is_primary_key {
-            fields_string.push_str(" PRIMARY KEY");
+            write_fields_string_into.push_str(" PRIMARY KEY");
         } else if !field_info.is_null {
-            fields_string.push_str(" NOT NULL");
+            write_fields_string_into.push_str(" NOT NULL");
         }
 
         if let Some(foreign_key_to_table_name) = field_info.foreign_key_to_table_name {
-            fields_string.push_str(" REFERENCES ");
-            fields_string.push('"');
-            fields_string.push_str(foreign_key_to_table_name);
-            fields_string.push('"');
+            write_fields_string_into.push_str(" REFERENCES ");
+            write_fields_string_into.push('"');
+            write_fields_string_into.push_str(foreign_key_to_table_name);
+            write_fields_string_into.push('"');
         }
 
-        fields_string.push(',');
+        write_fields_string_into.push(',');
     }
 
     // remove the trailing comma
-    if fields_string.ends_with(',') {
-        fields_string.pop();
+    if write_fields_string_into.ends_with(',') {
+        write_fields_string_into.pop();
     }
-
-    fields_string
 }
