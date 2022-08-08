@@ -1,8 +1,5 @@
-#![feature(associated_const_equality)]
-use std::borrow::Borrow;
-
 use gorm::{
-    execution::{DatabaseConnection, DatabaseConnectionPool},
+    execution::DatabaseConnectionPool,
     migration, returning, select_values, selected_value_to_order_by,
     sql::{
         self, AddableSqlExpression, BooleanAndableSqlExpression, BooleanOrableSqlExpression,

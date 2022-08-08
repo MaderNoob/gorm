@@ -94,18 +94,18 @@ pub trait LoadSingleColumnSqlStatment<
 >: SqlStatement<OutputFields = FieldsConsListCons<FieldName, FieldType, TypedConsListNil>>
 {
     async fn load_one_value(self, on: &impl SqlStatementExecutor) -> Result<FieldType> {
-        on.load_one_one_column(self).await
+        on.load_one_value(self).await
     }
 
     async fn load_optional_value(
         self,
         on: &impl SqlStatementExecutor,
     ) -> Result<Option<FieldType>> {
-        on.load_optional_one_column(self).await
+        on.load_optional_value(self).await
     }
 
     async fn load_all_values(self, on: &impl SqlStatementExecutor) -> Result<Vec<FieldType>> {
-        on.load_all_one_column(self).await
+        on.load_all_values(self).await
     }
 }
 

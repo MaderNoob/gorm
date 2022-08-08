@@ -1,4 +1,4 @@
-use deadpool_postgres::{tokio_postgres::types::FromSqlOwned, Object};
+use deadpool_postgres::Object;
 
 use super::transaction::DatabaseTransactionFromPool;
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     FromQueryResult,
 };
 
-/// An database connection.
+/// A database connection from a connection pool.
 pub struct DatabaseConnectionFromPool {
     pub(super) client: Object,
 }
@@ -16,8 +16,8 @@ pub struct DatabaseConnectionFromPool {
 impl DatabaseConnectionFromPool {
     /// Begins a transaction on this database connection.
     ///
-    /// The transaction will roll back when dropped by default, use the `commit`
-    /// method to commit it.
+    /// The transaction will roll back when dropped by default, use the
+    /// [`DatabaseTransactionFromPool::commit`] function to commit it.
     pub async fn begin_transaction(&mut self) -> Result<DatabaseTransactionFromPool> {
         Ok(DatabaseTransactionFromPool {
             transaction: self.client.transaction().await?,

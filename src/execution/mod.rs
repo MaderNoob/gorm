@@ -1,7 +1,19 @@
-use async_trait::async_trait;
-use deadpool_postgres::tokio_postgres::types::FromSqlOwned;
+//! Execution of sql statements.
+//!
+//! This module provides different ways to execute sql statements - connections, transactions,
+//! connection pools.
+//!
+//! The [`SqlStatementExecutor`] trait is the core of this module, and this module provides
+//! different types that implement it.
 
-use crate::{error::*, sql::FromQueryResult, statements::SqlStatement};
+use async_trait::async_trait;
+
+use crate::{
+    error::*,
+    sql::FromQueryResult,
+    statements::SqlStatement,
+    TypedConsListNil, TypesNotEqual,
+};
 
 mod connection;
 mod connection_pool;
@@ -11,40 +23,95 @@ pub use connection::*;
 pub use connection_pool::*;
 pub use transaction::*;
 
-/// An executor which can execute sql statements
+/// An executor which can execute sql statements.
 #[async_trait]
 pub trait SqlStatementExecutor: Sized + Send + Sync {
+    /// Executes the given sql statement.
     async fn execute(&self, statement: impl SqlStatement + Send) -> Result<ExecuteResult>;
 
+    /// Executes the given sql statement and loads the first returned row from
+    /// it.
     async fn load_one<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
         statement: S,
-    ) -> Result<O>;
+    ) -> Result<O>
+    where
+        (S::OutputFields, TypedConsListNil): TypesNotEqual;
 
-    async fn load_one_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+    /// Executes the given sql statement and loads the first column of the first
+    /// returned row from it.
+    async fn load_one_value<
+        FieldName: crate::sql::FieldNameCharsConsListItem,
+        FieldType: deadpool_postgres::tokio_postgres::types::FromSqlOwned + Send,
+        S: SqlStatement<
+                OutputFields = crate::sql::FieldsConsListCons<
+                    FieldName,
+                    FieldType,
+                    crate::util::TypedConsListNil,
+                >,
+            > + Send,
+    >(
         &self,
         statement: S,
-    ) -> Result<O>;
+    ) -> Result<FieldType>;
 
+    // pub trait LoadSingleColumnSqlStatment<
+    //     FieldName: FieldNameCharsConsListItem,
+    //     FieldType: FromSqlOwned + Send,
+    // >: SqlStatement<OutputFields = FieldsConsListCons<FieldName, FieldType,
+    // TypedConsListNil>>
+
+    /// Executes the given sql statement and loads the first returned row from
+    /// it, if any.
     async fn load_optional<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
         statement: S,
-    ) -> Result<Option<O>>;
+    ) -> Result<Option<O>>
+    where
+        (S::OutputFields, TypedConsListNil): TypesNotEqual;
 
-    async fn load_optional_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+    /// Executes the given sql statement and loads the first column first
+    /// returned row from it, if any.
+    async fn load_optional_value<
+        FieldName: crate::sql::FieldNameCharsConsListItem,
+        FieldType: deadpool_postgres::tokio_postgres::types::FromSqlOwned + Send,
+        S: SqlStatement<
+                OutputFields = crate::sql::FieldsConsListCons<
+                    FieldName,
+                    FieldType,
+                    crate::util::TypedConsListNil,
+                >,
+            > + Send,
+    >(
         &self,
         statement: S,
-    ) -> Result<Option<O>>;
+    ) -> Result<Option<FieldType>>;
 
+    /// Executes the given sql statement and loads all the rows returned from
+    /// it.
     async fn load_all<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
         statement: S,
-    ) -> Result<Vec<O>>;
+    ) -> Result<Vec<O>>
+    where
+        (S::OutputFields, TypedConsListNil): TypesNotEqual;
 
-    async fn load_all_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+    /// Executes the given sql statement and loads the first column of all the
+    /// rows returned from it.
+    async fn load_all_values<
+        FieldName: crate::sql::FieldNameCharsConsListItem,
+        FieldType: deadpool_postgres::tokio_postgres::types::FromSqlOwned + Send,
+        S: SqlStatement<
+                OutputFields = crate::sql::FieldsConsListCons<
+                    FieldName,
+                    FieldType,
+                    crate::util::TypedConsListNil,
+                >,
+            > + Send,
+    >(
         &self,
         statement: S,
-    ) -> Result<Vec<O>>;
+    ) -> Result<Vec<FieldType>>;
 }
 
 /// The result of executing an sql statement.
@@ -53,8 +120,10 @@ pub struct ExecuteResult {
     pub rows_modified: u64,
 }
 
+/// Implements the [`SqlStatementExecutor`] trait for some type, given a
+/// function which returns its raw executor, and its generics.
 macro_rules! impl_sql_statement_executor {
-    {$impl_for: ty, $get_client: expr $(,$($generic:tt),+)?} => {
+    {$impl_for: ty, $get_raw_executor: expr $(,$($generic:tt),+)?} => {
         #[async_trait::async_trait]
         impl $(< $($generic),+ >)? crate::execution::SqlStatementExecutor for $impl_for {
             async fn execute(
@@ -62,7 +131,7 @@ macro_rules! impl_sql_statement_executor {
                 statement: impl crate::statements::SqlStatement + Send,
             ) -> Result<ExecuteResult> {
                 let (query_string, parameter_binder) = statement.build();
-                let rows_modified = $get_client(self).await?
+                let rows_modified = $get_raw_executor(self).await?
                     .execute(&query_string, parameter_binder.parameters())
                     .await?;
 
@@ -72,11 +141,14 @@ macro_rules! impl_sql_statement_executor {
             async fn load_one<O: FromQueryResult, S: SqlStatement + Send>(
                 &self,
                 statement: S,
-            ) -> Result<O> {
+            ) -> Result<O>
+            where
+                (S::OutputFields, crate::util::TypedConsListNil): crate::util::TypesNotEqual
+            {
                 use futures::{pin_mut, TryStreamExt};
 
                 let (query_string, parameter_binder) = statement.build();
-                let row_stream = $get_client(self).await?
+                let row_stream = $get_raw_executor(self).await?
                     .query_raw(&query_string, parameter_binder.parameters().iter().copied())
                     .await?;
 
@@ -89,14 +161,24 @@ macro_rules! impl_sql_statement_executor {
                 }
             }
 
-            async fn load_one_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+            async fn load_one_value<
+                FieldName: crate::sql::FieldNameCharsConsListItem,
+                FieldType: deadpool_postgres::tokio_postgres::types::FromSqlOwned + Send,
+                S: SqlStatement<
+                        OutputFields = crate::sql::FieldsConsListCons<
+                            FieldName,
+                            FieldType,
+                            crate::util::TypedConsListNil,
+                        >,
+                    > + Send,
+            >(
                 &self,
                 statement: S,
-            ) -> Result<O> {
+            ) -> Result<FieldType> {
                 use futures::{pin_mut, TryStreamExt};
 
                 let (query_string, parameter_binder) = statement.build();
-                let row_stream = $get_client(self).await?
+                let row_stream = $get_raw_executor(self).await?
                     .query_raw(&query_string, parameter_binder.parameters().iter().copied())
                     .await?;
 
@@ -112,11 +194,14 @@ macro_rules! impl_sql_statement_executor {
             async fn load_optional<O: FromQueryResult, S: SqlStatement + Send>(
                 &self,
                 statement: S,
-            ) -> Result<Option<O>> {
+            ) -> Result<Option<O>>
+            where
+                (S::OutputFields, crate::util::TypedConsListNil): crate::util::TypesNotEqual
+            {
                 use futures::{pin_mut, TryStreamExt};
 
                 let (query_string, parameter_binder) = statement.build();
-                let row_stream = $get_client(self).await?
+                let row_stream = $get_raw_executor(self).await?
                     .query_raw(&query_string, parameter_binder.parameters().iter().copied())
                     .await?;
 
@@ -129,14 +214,24 @@ macro_rules! impl_sql_statement_executor {
                 }
             }
 
-            async fn load_optional_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+            async fn load_optional_value<
+                FieldName: crate::sql::FieldNameCharsConsListItem,
+                FieldType: deadpool_postgres::tokio_postgres::types::FromSqlOwned + Send,
+                S: SqlStatement<
+                        OutputFields = crate::sql::FieldsConsListCons<
+                            FieldName,
+                            FieldType,
+                            crate::util::TypedConsListNil,
+                        >,
+                    > + Send,
+            >(
                 &self,
                 statement: S,
-            ) -> Result<Option<O>> {
+            ) -> Result<Option<FieldType>> {
                 use futures::{pin_mut, TryStreamExt};
 
                 let (query_string, parameter_binder) = statement.build();
-                let row_stream = $get_client(self).await?
+                let row_stream = $get_raw_executor(self).await?
                     .query_raw(&query_string, parameter_binder.parameters().iter().copied())
                     .await?;
 
@@ -152,11 +247,14 @@ macro_rules! impl_sql_statement_executor {
             async fn load_all<O: FromQueryResult + Send, S: SqlStatement + Send>(
                 &self,
                 statement: S,
-            ) -> Result<Vec<O>> {
+            ) -> Result<Vec<O>>
+            where
+                (S::OutputFields, crate::util::TypedConsListNil): crate::util::TypesNotEqual
+            {
                 use futures::{pin_mut, TryStreamExt};
 
                 let (query_string, parameter_binder) = statement.build();
-                let row_stream = $get_client(self).await?
+                let row_stream = $get_raw_executor(self).await?
                     .query_raw(&query_string, parameter_binder.parameters().iter().copied())
                     .await?;
 
@@ -169,14 +267,24 @@ macro_rules! impl_sql_statement_executor {
                 Ok(records)
             }
 
-            async fn load_all_one_column<O: FromSqlOwned + Send, S: SqlStatement + Send>(
+            async fn load_all_values<
+                FieldName: crate::sql::FieldNameCharsConsListItem,
+                FieldType: deadpool_postgres::tokio_postgres::types::FromSqlOwned + Send,
+                S: SqlStatement<
+                        OutputFields = crate::sql::FieldsConsListCons<
+                            FieldName,
+                            FieldType,
+                            crate::util::TypedConsListNil,
+                        >,
+                    > + Send,
+            >(
                 &self,
                 statement: S,
-            ) -> Result<Vec<O>> {
+            ) -> Result<Vec<FieldType>> {
                 use futures::{pin_mut, TryStreamExt};
 
                 let (query_string, parameter_binder) = statement.build();
-                let row_stream = $get_client(self).await?
+                let row_stream = $get_raw_executor(self).await?
                     .query_raw(&query_string, parameter_binder.parameters().iter().copied())
                     .await?;
 

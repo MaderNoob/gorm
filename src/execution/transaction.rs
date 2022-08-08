@@ -1,4 +1,4 @@
-use deadpool_postgres::tokio_postgres::{types::FromSqlOwned, Transaction};
+use deadpool_postgres::tokio_postgres::Transaction;
 
 use crate::{
     error::*,
@@ -7,7 +7,12 @@ use crate::{
     statements::SqlStatement,
 };
 
-/// An database connection.
+/// A database transaction.
+///
+/// The transaction can be commited using the [`DatabaseTransaction::commit`] function.
+///
+/// When the transaction is dropped, if the transaction was not commited, it is automatically
+/// rolled back.
 pub struct DatabaseTransaction<'a> {
     pub(super) transaction: Transaction<'a>,
 }

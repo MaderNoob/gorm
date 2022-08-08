@@ -1,4 +1,4 @@
-use deadpool_postgres::tokio_postgres::{types::FromSqlOwned, Client, NoTls};
+use deadpool_postgres::tokio_postgres::{Client, NoTls};
 
 use super::transaction::DatabaseTransaction;
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     statements::SqlStatement,
 };
 
-/// An database connection.
+/// A database connection.
 pub struct DatabaseConnection {
     client: Client,
 }
@@ -31,8 +31,8 @@ impl DatabaseConnection {
 
     /// Begins a transaction on this database connection.
     ///
-    /// The transaction will roll back when dropped by default, use the `commit`
-    /// method to commit it.
+    /// The transaction will roll back when dropped by default, use the
+    /// [`DatabaseTransaction::commit`] function to commit it.
     pub async fn begin_transaction(&mut self) -> Result<DatabaseTransaction> {
         Ok(DatabaseTransaction {
             transaction: self.client.transaction().await?,
