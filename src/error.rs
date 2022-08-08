@@ -32,5 +32,5 @@ pub enum Error {
     NoRecords,
 }
 
-/// A result type with [`Error`] as its error type.
+/// A result type with [`enum@Error`] as its error type.
 pub type Result<T> = std::result::Result<T, Error>;

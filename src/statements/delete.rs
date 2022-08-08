@@ -83,6 +83,8 @@ macro_rules! impl_sql_statement_for_delete_statement {
 ///
 /// This statement can be created by calling the [`TableMarker::delete`]
 /// function.
+///
+/// [`TableMarker::delete`]: crate::sql::TableMarker::delete
 pub struct EmptyDeleteStatement<T: Table>(PhantomData<T>);
 impl<T: Table> EmptyDeleteStatement<T> {
     /// Creates a new sql delete statement which deletes all records from the
@@ -259,7 +261,7 @@ pub trait Returning: DeleteStatement<HasReturningClause = TypedFalse> {
     /// delete statement. To provide a list of values to be returned, use the
     /// [`returning!`] macro.
     ///
-    /// [`returning!`]: gorm::returning
+    /// [`returning!`]: crate::returning
     fn returning<R: SelectedValues<Self::DeleteFrom>>(
         self,
         returning: R,

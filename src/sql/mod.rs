@@ -14,7 +14,7 @@ mod sql_functions;
 mod table;
 mod types;
 
-pub use bound_parameters::ParameterBinder;
+pub use bound_parameters::*;
 pub use condition::*;
 pub use expr::*;
 pub use fields_list::*;

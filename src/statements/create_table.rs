@@ -10,6 +10,8 @@ use crate::{
 ///
 /// This statement can be created by calling the [`TableMarker::create`]
 /// function.
+///
+/// [`TableMarker::create`]: crate::sql::TableMarker::create
 pub struct CreateTableStatement<T: Table>(PhantomData<T>);
 impl<T: Table> CreateTableStatement<T> {
     /// Creates a new sql create table statement.

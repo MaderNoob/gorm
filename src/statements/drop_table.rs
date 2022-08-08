@@ -10,6 +10,8 @@ use crate::{
 ///
 /// This statement can be created by calling the [`TableMarker::drop`]
 /// function.
+///
+/// [`TableMarker::drop`]: crate::sql::TableMarker::drop
 pub struct DropTableStatement<T: Table>(PhantomData<T>);
 impl<T: Table> DropTableStatement<T> {
     /// Creates a new sql drop table statement.
