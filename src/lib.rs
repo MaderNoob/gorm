@@ -87,6 +87,12 @@
 //! ```
 //!
 //! [`Table`]: gorm_macros::Table
+//!
+//! # Migration Cli
+//!
+//! If you want to create a cli to manage your migration, you can use the `migration_cli` feature
+//! flag. This feature flag will provide you the `migration_cli_main` function which you can call
+//! in your main function and it will take care of the rest.
 
 #![feature(auto_traits)]
 #![feature(negative_impls)]
