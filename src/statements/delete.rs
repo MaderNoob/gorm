@@ -2,8 +2,9 @@ use std::marker::PhantomData;
 
 use super::SqlStatement;
 use crate::{
-    sql::{FieldsConsListItem, ParameterBinder, SelectedValues, SqlExpression, SqlBool},
-    Table, TypedBool, TypedConsListNil, TypedFalse, TypedTrue,
+    sql::{FieldsConsListItem, ParameterBinder, SelectedValues, SqlBool, SqlExpression},
+    util::{TypedBool, TypedConsListNil, TypedFalse, TypedTrue},
+    Table,
 };
 
 /// Represents any type of sql delete statement.
@@ -139,8 +140,10 @@ pub struct DeleteWithWhereClause<
     condition: C,
 }
 
-impl<S: DeleteStatement<HasWhereClause = TypedFalse>, C: SqlExpression<S::DeleteFrom, SqlType = SqlBool>>
-    DeleteStatement for DeleteWithWhereClause<S, C>
+impl<
+        S: DeleteStatement<HasWhereClause = TypedFalse>,
+        C: SqlExpression<S::DeleteFrom, SqlType = SqlBool>,
+    > DeleteStatement for DeleteWithWhereClause<S, C>
 {
     type DeleteFrom = S::DeleteFrom;
     type HasReturningClause = S::HasReturningClause;
@@ -174,9 +177,9 @@ impl<S: DeleteStatement<HasWhereClause = TypedFalse>, C: SqlExpression<S::Delete
 }
 
 impl<
-    S: DeleteStatement<HasWhereClause = TypedFalse> + 'static,
-    C: SqlExpression<S::DeleteFrom, SqlType = SqlBool> + 'static,
-> SqlStatement for DeleteWithWhereClause<S, C>
+        S: DeleteStatement<HasWhereClause = TypedFalse> + 'static,
+        C: SqlExpression<S::DeleteFrom, SqlType = SqlBool> + 'static,
+    > SqlStatement for DeleteWithWhereClause<S, C>
 {
     impl_sql_statement_for_delete_statement! {}
 }
@@ -247,9 +250,9 @@ impl<S: DeleteStatement<HasReturningClause = TypedFalse>, R: SelectedValues<S::D
 }
 
 impl<
-    S: DeleteStatement<HasReturningClause = TypedFalse> + 'static,
-    R: SelectedValues<S::DeleteFrom> + 'static,
-> SqlStatement for WithReturningClause<S, R>
+        S: DeleteStatement<HasReturningClause = TypedFalse> + 'static,
+        R: SelectedValues<S::DeleteFrom> + 'static,
+    > SqlStatement for WithReturningClause<S, R>
 {
     impl_sql_statement_for_delete_statement! {}
 }

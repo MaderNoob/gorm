@@ -21,7 +21,7 @@ use crate::{
         FieldNameCharsConsListItem, FieldsConsListCons, FieldsConsListItem, FromQueryResult,
         ParameterBinder,
     },
-    TypedConsListNil, TypesNotEqual,
+    util::{TypedConsListNil, TypesNotEqual},
 };
 
 /// An sql statement which can be built into an sql string and a list of bound parameters.

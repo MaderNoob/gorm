@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 
-use crate::{TypedBool, TypedFalse, TypedTrue, TypesEqual};
+use crate::util::{TypedBool, TypedFalse, TypedTrue, TypesEqual};
 
 /// An sql type.
 pub trait SqlType {

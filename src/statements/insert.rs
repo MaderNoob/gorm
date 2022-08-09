@@ -1,7 +1,8 @@
 use super::SqlStatement;
 use crate::{
     sql::{Insertable, ParameterBinder, SelectedValues},
-    Table, TypedConsListNil,
+    util::TypedConsListNil,
+    Table,
 };
 
 /// An sql insert statement.

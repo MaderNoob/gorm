@@ -8,7 +8,7 @@ use crate::{
         ExecuteSqlStatment, InsertStatement, LoadSingleColumnSqlStatment, LoadSqlStatment,
         ReturningInsertStatement,
     },
-    FromQueryResult, Table, TypedConsListNil, TypesNotEqual,
+    FromQueryResult, Table, util::{TypedConsListNil, TypesNotEqual},
 };
 
 /// A record type which can be inserted into the database.

@@ -8,7 +8,7 @@ use crate::{
         SelectedValuesContainsFieldWithName, SqlExpression, SqlType, Table,
         TableMarker, SqlBool,
     },
-    TypedBool, TypedFalse, TypedTrue, TypesEqual,
+    util::{TypedBool, TypedFalse, TypedTrue, TypesEqual},
 };
 
 /// Represents any type of sql select statement.

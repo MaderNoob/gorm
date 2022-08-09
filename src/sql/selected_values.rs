@@ -1,7 +1,7 @@
 use super::{Column, FieldNameCharsConsListItem, FieldsConsListCons, SelectableTablesContains};
 use crate::{
     sql::{FieldsConsListItem, ParameterBinder, SelectableTables},
-    TypedConsListNil,
+    util::TypedConsListNil,
 };
 
 /// The selected values in an sql query.

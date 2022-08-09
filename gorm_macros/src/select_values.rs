@@ -192,7 +192,7 @@ fn create_selected_values_fields_cons_list(
     select_values_input: &SelectValuesInput,
 ) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each field.
-    let mut cur = quote! { ::gorm::TypedConsListNil };
+    let mut cur = quote! { ::gorm::util::TypedConsListNil };
 
     for (i, selected_value) in select_values_input.values.iter().enumerate().rev() {
         // safe to unwrap here because only structs with named fields are allowed.

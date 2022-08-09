@@ -12,7 +12,7 @@ use crate::{
     error::*,
     sql::FromQueryResult,
     statements::SqlStatement,
-    TypedConsListNil, TypesNotEqual,
+    util::{TypedConsListNil, TypesNotEqual},
 };
 
 mod connection;

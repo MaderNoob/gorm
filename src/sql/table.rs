@@ -1,7 +1,7 @@
 use crate::{
     sql::{FieldsConsListItem, IntoSqlType, SqlType},
     statements::{CreateTableStatement, DropTableStatement, EmptyDeleteStatement},
-    TypesEqual,
+    util::TypesEqual,
 };
 
 use super::FieldNameCharsConsListItem;

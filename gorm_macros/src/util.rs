@@ -3,7 +3,7 @@ use syn::Type;
 
 pub fn generate_field_name_cons_list_type(field_name: &str) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each character.
-    let mut cur = quote! { ::gorm::TypedConsListNil };
+    let mut cur = quote! { ::gorm::util::TypedConsListNil };
 
     for chr in field_name.chars().rev() {
         cur = quote! {
@@ -18,7 +18,7 @@ pub fn generate_fields_cons_list_type<'a>(
     fields: impl Iterator<Item = (&'a Option<proc_macro2::Ident>, &'a Type)> + DoubleEndedIterator,
 ) -> proc_macro2::TokenStream {
     // start with the inner most type and wrap it each time with each field.
-    let mut cur = quote! { ::gorm::TypedConsListNil };
+    let mut cur = quote! { ::gorm::util::TypedConsListNil };
 
     for field in fields.rev() {
         // safe to unwrap here because only structs with named fields are allowed.
