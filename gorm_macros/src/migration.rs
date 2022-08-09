@@ -46,6 +46,8 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
         impl ::gorm::sql::Migration for #struct_name{
             async fn up<E: ::gorm::execution::SqlStatementExecutor + ::std::marker::Send + std::marker::Sync>(executor: &E) -> ::gorm::Result<()>{
                 use ::gorm::futures::future::FutureExt;
+                use ::gorm::sql::TableMarker;
+                use ::gorm::statements::ExecuteSqlStatment;
 
                 #map_result_to_unit_type_fn_definition_ref
 
@@ -56,6 +58,8 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
 
             async fn down<E: ::gorm::execution::SqlStatementExecutor + ::std::marker::Send + std::marker::Sync>(executor: &E) -> ::gorm::Result<()>{
                 use ::gorm::futures::future::FutureExt;
+                use ::gorm::sql::TableMarker;
+                use ::gorm::statements::ExecuteSqlStatment;
 
                 #map_result_to_unit_type_fn_definition_ref
 

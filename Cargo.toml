@@ -6,10 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = [
-	"gorm_macros",
-	"gorm_test"
-]
+members = ["gorm_macros"]
 
 [dependencies]
 gorm_macros = { path = "gorm_macros" }
@@ -19,9 +16,16 @@ futures = "0.3.21"
 tokio = { version = "1.20.0", features = ["rt-multi-thread"] }
 rust_decimal = { version = "1.25.0", features = ["db-tokio-postgres"] }
 deadpool-postgres = "0.10.2"
-clap = { version = "3.2.16", features = ["color", "suggestions", "derive"] , optional = true }
+clap = { version = "3.2.16", features = [
+  "color",
+  "suggestions",
+  "derive",
+], optional = true }
 anyhow = { version = "1.0.60", optional = true }
 
 [features]
 migration_cli = ["dep:clap", "dep:anyhow"]
 
+[dev-dependencies]
+tokio = { version = "1.20.0", features = ["full"] }
+anyhow = "1.0.60"
