@@ -1,6 +1,6 @@
 use super::{
-    AverageableSqlType, OrderableSqlType, SelectableTables, SqlAverage, SqlCount, SqlCountRows,
-    SqlExpression, SqlMax, SqlMin, SqlSum, SummableSqlType,
+    AverageableSqlType, OrderableSqlType, SelectableTables, SqlAverage, SqlBool, SqlCount,
+    SqlCountRows, SqlExpression, SqlMax, SqlMin, SqlNot, SqlSum, SummableSqlType,
 };
 
 macro_rules! define_one_expr_arg_sql_function {
@@ -21,9 +21,14 @@ define_one_expr_arg_sql_function! {sum, SqlSum, E::SqlType: SummableSqlType}
 define_one_expr_arg_sql_function! {max, SqlMax, E::SqlType: OrderableSqlType}
 define_one_expr_arg_sql_function! {min, SqlMin, E::SqlType: OrderableSqlType}
 
-/// Returns an expression which evaluates to the amount of all rows returned from the query. 
+/// Returns an expression which evaluates to the amount of all rows returned from the query.
 ///
 /// This will be translated to `COUNT(*)` when converted to sql.
 pub fn count_rows() -> SqlCountRows {
     SqlCountRows
+}
+
+/// Returns an expression which negates the value of the given boolean expression.
+pub fn not<S: SelectableTables, E: SqlExpression<S, SqlType = SqlBool>>(expr: E) -> SqlNot<S, E> {
+    SqlNot::new(expr)
 }

@@ -162,7 +162,7 @@ async fn main() {
     let people_names = person::table
         .find()
         .select(select_values!(person::name))
-        .filter(person::name.not_like("J%"))
+        .filter(sql::not(person::name.like("J%")))
         .load_all_values(&pool)
         .await
         .unwrap();
