@@ -10,13 +10,16 @@ use gorm::{
         ExecuteSqlStatment, Filter, GroupBy, InnerJoinTrait, LoadSingleColumnSqlStatment,
         LoadSqlStatment, OrderBy, OrderBySelectedValue, SelectFrom, SelectValues,
     },
-    FromQueryResult, Table,
+    FromQueryResult, Table, migration_cli_main,
 };
 struct CreateTablesMigration;
 migration! {CreateTablesMigration => school, pet, person}
 
 #[tokio::main]
 async fn main() {
+    migration_cli_main(CreateTablesMigration, "postgres://postgres:postgres@localhost/gorm_test").await;
+    return;
+
     let pool = DatabaseConnectionPool::connect("postgres://postgres:postgres@localhost/gorm_test")
         .await
         .unwrap();

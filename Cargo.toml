@@ -16,7 +16,9 @@ gorm_macros = { path = "gorm_macros" }
 async-trait = "0.1.56"
 thiserror = "1.0.31"
 futures = "0.3.21"
-tokio = { version = "1.20.0", features = ["rt"] }
+tokio = { version = "1.20.0", features = ["rt-multi-thread"] }
 rust_decimal = { version = "1.25.0", features = ["db-tokio-postgres"] }
 deadpool-postgres = "0.10.2"
+clap = { version = "3.2.16", features = ["color", "suggestions", "derive"] }
+anyhow = "1.0.60"
 

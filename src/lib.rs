@@ -87,6 +87,7 @@
 #![feature(negative_impls)]
 
 mod error;
+mod migration_cli;
 pub mod execution;
 pub mod sql;
 pub mod statements;
@@ -101,3 +102,4 @@ pub use gorm_macros::{
 };
 pub use rust_decimal::Decimal;
 pub use sql::{FromQueryResult, Table};
+pub use migration_cli::migration_cli_main;
