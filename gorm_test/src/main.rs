@@ -3,8 +3,8 @@ use gorm::{
     migration, returning, select_values, selected_value_to_order_by,
     sql::{
         self, AddableSqlExpression, BooleanAndableSqlExpression, BooleanOrableSqlExpression,
-        Insertable, Migration, MultipliableSqlExpression, OrderableSqlExpression, SqlExpression,
-        SummableSqlExpression, TableMarker,
+        Insertable, LikeableSqlExpression, Migration, MultipliableSqlExpression,
+        OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
     statements::{
         ExecuteSqlStatment, Filter, GroupBy, InnerJoinTrait, LoadSingleColumnSqlStatment,
@@ -158,6 +158,16 @@ async fn main() {
         .unwrap();
 
     println!("count: {}", count);
+
+    let people_names = person::table
+        .find()
+        .select(select_values!(person::name))
+        .filter(person::name.not_like("J%"))
+        .load_all_values(&pool)
+        .await
+        .unwrap();
+
+    println!("people names: {:?}", people_names);
 }
 
 #[derive(Debug, Table)]

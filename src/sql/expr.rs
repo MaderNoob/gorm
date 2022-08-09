@@ -1,8 +1,9 @@
 use std::fmt::Write;
 
 use super::{
-    AverageableSqlType, SqlAdd, SqlAddition, SqlAverage, SqlCount, SqlDivide, SqlDivision, SqlMax,
-    SqlMultiplication, SqlMultiply, SqlSubtract, SqlSubtraction, SqlSum, SummableSqlType,
+    AverageableSqlType, SqlAdd, SqlAddition, SqlAverage, SqlConditionLike, SqlConditionNotLike,
+    SqlCount, SqlDivide, SqlDivision, SqlMax, SqlMultiplication, SqlMultiply, SqlSubtract,
+    SqlSubtraction, SqlSum, SummableSqlType,
 };
 use crate::sql::{
     Column, IntoSqlType, OrderableSqlType, ParameterBinder, SelectableTables,
@@ -159,6 +160,32 @@ impl<S: SelectableTables, T: SqlExpression<S>> OrderableSqlExpression<S> for T w
 {
 }
 
+/// A trait which provides some functions to test if an sql string matches some certain pattern.
+pub trait LikeableSqlExpression<S: SelectableTables>: SqlExpression<S, SqlType = SqlText> {
+    /// Returns a condition which will be true if this string matches the given pattern.
+    ///
+    /// For more information about the provided pattern, check out the documentation on sql's
+    /// `LIKE` operator.
+    fn like<Rhs: SqlExpression<S, SqlType = SqlText>>(
+        self,
+        like_pattern: Rhs,
+    ) -> SqlConditionLike<S, Self, Rhs> {
+        SqlConditionLike::new(self, like_pattern)
+    }
+
+    /// Returns a condition which will be true if this string doesn't match the given pattern.
+    ///
+    /// For more information about the provided pattern, check out the documentation on sql's
+    /// `NOT LIKE` operator.
+    fn not_like<Rhs: SqlExpression<S, SqlType = SqlText>>(
+        self,
+        like_pattern: Rhs,
+    ) -> SqlConditionNotLike<S, Self, Rhs> {
+        SqlConditionNotLike::new(self, like_pattern)
+    }
+}
+
+impl<S: SelectableTables, T: SqlExpression<S, SqlType = SqlText>> LikeableSqlExpression<S> for T {}
 
 /// An sql expression which is averageable, which means that we can find the average value of it.
 pub trait AverageableSqlExpression<S: SelectableTables>: SqlExpression<S>
