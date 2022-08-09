@@ -1,10 +1,11 @@
-//! An orm that is simple to use and prevents runtime errors by using rust's rich type system to
-//! enforce sql logic at compile time.
+//! An orm that is simple to use and prevents runtime errors by using rust's
+//! rich type system to enforce sql logic at compile time.
 //!
 //! # Usage
 //!
-//! The core of this crate is the [`Table`] derive macro, which you can derive on your rust structs to
-//! tell the orm that they represent tables in your database.
+//! The core of this crate is the [`Table`] derive macro, which you can derive
+//! on your rust structs to tell the orm that they represent tables in your
+//! database.
 //!
 //! # Example
 //! ```rust
@@ -13,11 +14,11 @@
 //!     id: i32,
 //!     name: String,
 //!     age: i32,
-//! 
+//!
 //!     #[table(foreign_key = "School")]
 //!     school_id: i32,
 //! }
-//! 
+//!
 //! #[derive(Debug, Table)]
 //! pub struct School {
 //!     id: i32,
@@ -25,19 +26,18 @@
 //! }
 //!
 //! struct MyMigration;
-//! migration!{ MyMigration => school, person }
+//! migration! { MyMigration => school, person }
 //!
-//! let pool = DatabaseConnectionPool::connect("postgres://postgres:postgres@localhost/some_database")
-//!     .await?;
+//! let pool =
+//!     DatabaseConnectionPool::connect("postgres://postgres:postgres@localhost/some_database")
+//!         .await?;
 //!
 //! MyMigration::down(&pool).await?;
 //! MyMigration::up(&pool).await?;
 //!
-//! let school_id = school::new {
-//!     name: "Stanford",
-//! }
-//! .insert_returning_value(returning!(school::id), &pool)
-//! .await?;
+//! let school_id = school::new { name: "Stanford" }
+//!     .insert_returning_value(returning!(school::id), &pool)
+//!     .await?;
 //!
 //! person::new {
 //!     name: "James",
@@ -55,7 +55,10 @@
 //! let person_and_school_names = person::table
 //!     .inner_join(school::table)
 //!     .find()
-//!     .select(select_values!(person::name as person_name, school::name as school_name))
+//!     .select(select_values!(
+//!         person::name as person_name,
+//!         school::name as school_name
+//!     ))
 //!     .load_all::<PersonNameAndSchoolName>(&pool)
 //!     .await?;
 //!
@@ -66,7 +69,10 @@
 //! let age_sum_of_each_school_from_highest_to_lowest = person::table
 //!     .inner_join(school::table)
 //!     .find()
-//!     .select(select_values!(school::name as school_name, person::age.sum() as age_sum))
+//!     .select(select_values!(
+//!         school::name as school_name,
+//!         person::age.sum() as age_sum
+//!     ))
 //!     .group_by(school::id)
 //!     .order_by_selected_value_descending(selected_value_to_order_by!(age_sum))
 //!     .load_all::<AgeSumOfSchool>(&pool)
@@ -78,7 +84,6 @@
 //!     .select(select_values!(person::id))
 //!     .load_all_values(&pool)
 //!     .await?;
-//!
 //! ```
 //!
 //! [`Table`]: gorm_macros::Table
@@ -87,7 +92,6 @@
 #![feature(negative_impls)]
 
 mod error;
-mod migration_cli;
 pub mod execution;
 pub mod sql;
 pub mod statements;
@@ -102,4 +106,9 @@ pub use gorm_macros::{
 };
 pub use rust_decimal::Decimal;
 pub use sql::{FromQueryResult, Table};
+
+#[cfg(feature = "migration_cli")]
+mod migration_cli;
+
+#[cfg(feature = "migration_cli")]
 pub use migration_cli::migration_cli_main;
