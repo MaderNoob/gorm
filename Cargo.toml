@@ -15,7 +15,7 @@ license = "GPL-3.0-only"
 members = ["gorm_macros"]
 
 [dependencies]
-gorm_macros = { path = "gorm_macros" }
+gorm_macros = { path = "gorm_macros", version = "0.1.0" }
 async-trait = "0.1.56"
 thiserror = "1.0.31"
 futures = "0.3.21"
