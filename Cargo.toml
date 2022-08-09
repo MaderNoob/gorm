@@ -1,7 +1,13 @@
 [package]
 name = "gorm"
+authors = ["Roee Shoshani"]
 version = "0.1.0"
 edition = "2021"
+description = "An orm that is simple to use and prevents all mistakes at compile time"
+repository = "https://github.com/MaderNoob/gorm"
+keywords = ["orm", "sql", "database", "postgres", "async"]
+categories = ["database"]
+license = "GPL-3.0-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
