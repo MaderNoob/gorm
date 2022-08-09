@@ -7,11 +7,11 @@ use gorm::{
         OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
     },
     statements::{
-        ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy, InnerJoinTrait,
-        LoadSingleColumnSqlStatment, LoadSqlStatment, OrderBy, OrderBySelectedValue, Returning,
-        SelectFrom, SelectValues,
+        DeleteStatementReturning, ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy,
+        InnerJoinTrait, LoadSingleColumnSqlStatment, LoadSqlStatment, OrderBy,
+        OrderBySelectedValue, SelectFrom, SelectValues, UpdateStatementReturning,
     },
-    FromQueryResult,
+    update_set, FromQueryResult,
 };
 
 mod tables;
@@ -116,11 +116,11 @@ async fn main() -> anyhow::Result<()> {
 
     #[derive(Debug, FromQueryResult)]
     struct SomeAggregateExpression {
-        some_aggregate_expression: i64
+        some_aggregate_expression: i64,
     }
 
-    // this shows how you can use complicated aggregate expressions, and combine many query
-    // functions together to form a complicated query.
+    // this shows how you can use complicated aggregate expressions, and combine
+    // many query functions together to form a complicated query.
     let aggregate_exprs = person::table
         .find()
         .select(select_values!(
@@ -135,10 +135,10 @@ async fn main() -> anyhow::Result<()> {
 
     println!("aggregate expressions: {:?}", aggregate_exprs);
 
-    // this shows how you can use the `all` struct to select all fields of some table. In this
-    // example using `all` doesn't make much sense because we will get repetition in the results,
-    // since multiple people have the same `school_id`, but this is just for the sake of showing
-    // how it can be used.
+    // this shows how you can use the `all` struct to select all fields of some
+    // table. In this example using `all` doesn't make much sense because we
+    // will get repetition in the results, since multiple people have the same
+    // `school_id`, but this is just for the sake of showing how it can be used.
     let schools_of_people = person::table
         .inner_join(school::table)
         .find()
@@ -155,8 +155,8 @@ async fn main() -> anyhow::Result<()> {
         pet_name: String,
     }
 
-    // this shows how you can perform inner joins on optional foreign keys, which will return only
-    // the records whose foreign key column isn't `NULL`.
+    // this shows how you can perform inner joins on optional foreign keys, which
+    // will return only the records whose foreign key column isn't `NULL`.
     let person_and_pet_names = person::table
         .inner_join(pet::table)
         .find()
@@ -167,8 +167,8 @@ async fn main() -> anyhow::Result<()> {
 
     println!("{:?}", person_and_pet_names);
 
-    // This shows how you can load values in case you only want one column instead of parsing into
-    // a struct.
+    // This shows how you can load values in case you only want one column instead
+    // of parsing into a struct.
     let names = person::table
         .find()
         .select(select_values!(person::name))
@@ -185,6 +185,15 @@ async fn main() -> anyhow::Result<()> {
         .unwrap();
 
     println!("count: {}", count);
+
+    let ages = person::table
+        .update()
+        .set(update_set!(person::age = person::age.add(1)))
+        .returning(person::age)
+        .load_all_values(&pool)
+        .await?;
+
+    println!("updated ages: {:?}", ages);
 
     Ok(())
 }

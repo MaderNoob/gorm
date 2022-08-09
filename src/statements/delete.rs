@@ -206,8 +206,8 @@ impl<T: DeleteStatement<HasWhereClause = TypedFalse>> FilterDeleteStatement for 
 /// it.
 ///
 /// This wrapper shouldn't be used directly, you should instead use the
-/// [`Returning::returning`] function.
-pub struct WithReturningClause<
+/// [`DeleteStatementReturning::returning`] function.
+pub struct DeleteWithReturningClause<
     S: DeleteStatement<HasReturningClause = TypedFalse>,
     R: SelectedValues<S::DeleteFrom>,
 > {
@@ -216,7 +216,7 @@ pub struct WithReturningClause<
 }
 
 impl<S: DeleteStatement<HasReturningClause = TypedFalse>, R: SelectedValues<S::DeleteFrom>>
-    DeleteStatement for WithReturningClause<S, R>
+    DeleteStatement for DeleteWithReturningClause<S, R>
 {
     type DeleteFrom = S::DeleteFrom;
     type HasReturningClause = TypedTrue;
@@ -252,14 +252,14 @@ impl<S: DeleteStatement<HasReturningClause = TypedFalse>, R: SelectedValues<S::D
 impl<
         S: DeleteStatement<HasReturningClause = TypedFalse> + 'static,
         R: SelectedValues<S::DeleteFrom> + 'static,
-    > SqlStatement for WithReturningClause<S, R>
+    > SqlStatement for DeleteWithReturningClause<S, R>
 {
     impl_sql_statement_for_delete_statement! {}
 }
 
 /// A trait which allows returning some values from the records deleted by some
 /// delete statement.
-pub trait Returning: DeleteStatement<HasReturningClause = TypedFalse> {
+pub trait DeleteStatementReturning: DeleteStatement<HasReturningClause = TypedFalse> {
     /// Selects some values to be returned from the records deleted by this
     /// delete statement. To provide a list of values to be returned, use the
     /// [`returning!`] macro.
@@ -268,12 +268,12 @@ pub trait Returning: DeleteStatement<HasReturningClause = TypedFalse> {
     fn returning<R: SelectedValues<Self::DeleteFrom>>(
         self,
         returning: R,
-    ) -> WithReturningClause<Self, R> {
-        WithReturningClause {
+    ) -> DeleteWithReturningClause<Self, R> {
+        DeleteWithReturningClause {
             statement: self,
             returning,
         }
     }
 }
 
-impl<T: DeleteStatement<HasReturningClause = TypedFalse>> Returning for T {}
+impl<T: DeleteStatement<HasReturningClause = TypedFalse>> DeleteStatementReturning for T {}

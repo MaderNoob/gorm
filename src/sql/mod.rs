@@ -13,6 +13,7 @@ mod selected_values;
 mod sql_functions;
 mod table;
 mod types;
+mod update_set;
 
 pub use bound_parameters::*;
 pub use condition::*;
@@ -27,3 +28,4 @@ pub use selected_values::*;
 pub use sql_functions::*;
 pub use table::*;
 pub use types::*;
+pub use update_set::*;

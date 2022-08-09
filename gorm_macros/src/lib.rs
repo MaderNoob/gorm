@@ -3,6 +3,7 @@ mod migration;
 mod select_values;
 mod selected_value_to_order_by;
 mod table;
+mod update_set;
 mod util;
 
 use proc_macro::TokenStream;
@@ -67,8 +68,9 @@ use util::generate_field_name_cons_list_type;
 ///     .await?;
 /// ```
 ///
-/// Note that in the above example the `select` call has no effect on the query, but in some cases
-/// it might be more useful to use the `all` struct, for example when performing inner joins.
+/// Note that in the above example the `select` call has no effect on the query,
+/// but in some cases it might be more useful to use the `all` struct, for
+/// example when performing inner joins.
 #[proc_macro]
 pub fn select_values(input_tokens: TokenStream) -> TokenStream {
     select_values::select_values(input_tokens)
@@ -230,7 +232,7 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 ///
 /// Foreign keys allow you to perform joins on the tables, and we can then
 /// perform select queries on the joined tables, for example, for the above
-/// snippet we can do the following: 
+/// snippet we can do the following:
 ///
 /// ```rust
 /// let _ = person::table.inner_join(school::table)
@@ -284,4 +286,30 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn selected_value_to_order_by(input_tokens: TokenStream) -> TokenStream {
     selected_value_to_order_by::selected_value_to_order_by(input_tokens)
+}
+
+/// This macro allows providing a set of updates to perform on each row in an
+/// sql update statement.
+///
+/// The input to this macro should be a comma seperated list of assignments of sql expressions to
+/// columns, for example:
+///
+/// # Example
+/// ```rust
+/// let new_ages = person::table
+///     .update()
+///     .set(update_set!(person::age = person::age.add(1)))
+///     .returning(person::age)
+///     .load_all_values(...)
+///     .await?;
+///
+/// #[derive(Table)]
+/// struct Person {
+///     id: i32,
+///     age: i32,
+/// }
+/// ```
+#[proc_macro]
+pub fn update_set(input_tokens: TokenStream) -> TokenStream {
+    update_set::update_set(input_tokens)
 }

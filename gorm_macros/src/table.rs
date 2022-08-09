@@ -5,7 +5,7 @@ use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Lifetime, Type, Visibility};
 
-use crate::util::{generate_fields_cons_list_type, generate_field_name_cons_list_type};
+use crate::util::{generate_field_name_cons_list_type, generate_fields_cons_list_type};
 
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input_tokens as DeriveInput);
@@ -85,7 +85,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         ))
     });
 
-    let insertable = implement_insertables(&table_struct_ident, &fields);
+    let insertables = implement_insertables(&table_struct_ident, &fields);
 
     let all_fields_selected_struct =
         implement_all_fields_selected_struct(&fields_type, &table_struct_ident, &table_name);
@@ -129,7 +129,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
             #table_marker
 
-            #insertable
+            #insertables
 
             #all_fields_selected_struct
         }
@@ -278,6 +278,38 @@ fn implement_insertable_with_fields(
 ) -> proc_macro2::TokenStream {
     let insertable_struct_name_ident =
         proc_macro2::Ident::new(insertable_struct_name, proc_macro2::Span::call_site());
+
+    // special case for when the insertable has no fields. this happens when
+    // implementing the `new` struct for a table that only has an `id` field.
+    if fields.is_empty() {
+        return quote! {
+            /// A struct which allows inserting new records into the table.
+            pub struct #insertable_struct_name_ident;
+
+            impl ::gorm::sql::Insertable for #insertable_struct_name_ident
+            {
+                type Table = super::#table_struct_ident;
+
+                fn write_value_names(
+                    &self,
+                    f: &mut ::std::string::String,
+                ) -> ::std::fmt::Result {
+                    Ok(())
+                }
+
+                fn write_values<'s, 'a>(
+                    &'s self,
+                    f: &mut String,
+                    parameter_binder: &mut ::gorm::sql::ParameterBinder<'a>,
+                ) -> std::fmt::Result
+                where
+                    's: 'a
+                {
+                    Ok(())
+                }
+            }
+        };
+    }
 
     let new_fields = fields.iter().enumerate().map(|(i, (ident, _ty))| {
         let borrow_generic_ident =

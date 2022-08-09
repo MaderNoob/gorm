@@ -1,6 +1,6 @@
 use crate::{
     sql::{FieldsConsListItem, IntoSqlType, SqlType},
-    statements::{CreateTableStatement, DropTableStatement, EmptyDeleteStatement},
+    statements::{CreateTableStatement, DropTableStatement, EmptyDeleteStatement, EmptyUpdateStatement},
     util::TypesEqual,
 };
 
@@ -76,6 +76,11 @@ pub trait TableMarker: Sized + 'static {
     /// Returns a delete statement for this table
     fn delete(self) -> EmptyDeleteStatement<Self::Table> {
         EmptyDeleteStatement::new()
+    }
+
+    /// Returns an update statement for this table
+    fn update(self) -> EmptyUpdateStatement<Self::Table> {
+        EmptyUpdateStatement::new()
     }
 }
 

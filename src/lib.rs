@@ -112,7 +112,7 @@ pub use deadpool_postgres::tokio_postgres;
 pub use error::*;
 pub use futures;
 pub use gorm_macros::{
-    migration, returning, select_values, selected_value_to_order_by, FromQueryResult, Table,
+    migration, returning, select_values, selected_value_to_order_by, update_set, FromQueryResult, Table,
 };
 pub use rust_decimal::Decimal;
 pub use sql::{FromQueryResult, Table};
