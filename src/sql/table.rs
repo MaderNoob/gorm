@@ -4,6 +4,8 @@ use crate::{
     TypesEqual,
 };
 
+use super::FieldNameCharsConsListItem;
+
 /// A table in the database.
 pub trait Table: Sized + 'static {
     /// A type used to identify the fields of the table.
@@ -41,6 +43,9 @@ pub struct TableField {
 pub trait Column {
     /// The name of the column as a string.
     const COLUMN_NAME: &'static str;
+
+    /// A type used to identify the name of the column.
+    type ColumnName: FieldNameCharsConsListItem;
 
     /// The table which this column belongs to.
     type Table: Table;

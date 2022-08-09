@@ -5,7 +5,7 @@ use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Lifetime, Type, Visibility};
 
-use crate::util::generate_fields_cons_list_type;
+use crate::util::{generate_fields_cons_list_type, generate_field_name_cons_list_type};
 
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input_tokens as DeriveInput);
@@ -201,12 +201,14 @@ fn generate_column_struct(
     table_struct_ident: &proc_macro2::Ident,
 ) -> proc_macro2::TokenStream {
     let column_name = column_name_ident.to_string();
+    let column_name_type = generate_field_name_cons_list_type(&column_name);
     quote! {
         pub struct #column_name_ident;
 
         #[automatically_derived]
         impl ::gorm::sql::Column for #column_name_ident {
             const COLUMN_NAME:&'static str = #column_name;
+            type ColumnName = #column_name_type;
             type Table = super::#table_struct_ident;
             type SqlType = <#column_type as ::gorm::sql::IntoSqlType>::SqlType;
             type RustType = #column_type;
