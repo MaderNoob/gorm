@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use convert_case::{Case, Casing};
-use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta};
+use darling::{ast::Fields, util::Flag, FromDeriveInput, FromField, FromMeta};
 use itertools::Itertools;
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
@@ -117,16 +117,26 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     let unique_constraint_structs = unique_constraints
         .iter()
-        .map(|unique_constraint| unique_constraint.generate_table_unique_constraint_struct());
+        .map(|unique_constraint| unique_constraint.generate_table_unique_constraint_struct())
+        .chain(
+            fields
+                .iter()
+                .filter_map(|field| field.generate_table_unique_constraint_struct()),
+        );
 
     let insertables = implement_insertables(&table_struct_ident, &fields);
 
     let all_fields_selected_struct =
         implement_all_fields_selected_struct(&fields_type, &table_struct_ident, &table_name);
 
-    let unique_constraint_marker_structs = unique_constraints.iter().map(|unique_constraint| {
-        unique_constraint.generate_unique_constraint_marker_struct(&table_struct_ident)
-    });
+    let unique_constraint_marker_structs = unique_constraints
+        .iter()
+        .map(|unique_constraint| {
+            unique_constraint.generate_unique_constraint_marker_struct(&table_struct_ident)
+        })
+        .chain(fields.iter().filter_map(|field| {
+            field.generate_unique_constraint_marker_struct(&table_struct_ident)
+        }));
 
     quote! {
         #[automatically_derived]
@@ -211,6 +221,7 @@ struct TableInputField {
     ident: Option<proc_macro2::Ident>,
     ty: Type,
     foreign_key: ForeignKeySpecification,
+    unique: Flag,
 }
 impl TableInputField {
     fn generate_table_field_struct(&self) -> proc_macro2::TokenStream {
@@ -239,15 +250,50 @@ impl TableInputField {
             None => quote! { None },
         };
 
+        let is_unique = self.unique.is_present();
+
         quote! {
             ::gorm::sql::TableField {
                 name: stringify!(#name),
                 is_primary_key: #is_primary_key,
+                is_unique: #is_unique,
                 foreign_key_to_table_name: #foreign_key_to_table_name,
                 sql_type_name: #sql_type_name,
                 is_null: #is_null,
             }
         }
+    }
+
+    fn generate_table_unique_constraint_struct(&self) -> Option<proc_macro2::TokenStream> {
+        if !self.unique.is_present() {
+            return None;
+        }
+        let field_name_string = self.ident.as_ref().unwrap().to_string();
+        Some(quote! {
+            ::gorm::sql::TableUniqueConstraint {
+                fields: &[#field_name_string],
+            }
+        })
+    }
+
+    fn generate_unique_constraint_marker_struct(
+        &self,
+        table_struct_ident: &proc_macro2::Ident,
+    ) -> Option<proc_macro2::TokenStream> {
+        if !self.unique.is_present() {
+            return None;
+        }
+        let field_name_ident = self.ident.as_ref().unwrap();
+        let field_name_string = field_name_ident.to_string();
+        Some(quote! {
+            pub struct #field_name_ident;
+
+            #[automatically_derived]
+            impl ::gorm::sql::UniqueConstraint for #field_name_ident {
+                type Table = super::super::#table_struct_ident;
+                const FIELDS_COMMA_SEPERATED:&'static str = #field_name_string;
+            }
+        })
     }
 }
 

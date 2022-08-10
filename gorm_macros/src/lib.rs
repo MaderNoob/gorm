@@ -254,7 +254,7 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 /// Foreign keys can also be optional, for example:
 /// ```rust
 /// #[derive(Table)]
-/// struct MaybeStudent {
+/// pub struct MaybeStudent {
 ///     id: i32,
 ///
 ///     #[table(foreign_key(School))]
@@ -273,6 +273,16 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 /// Unique constraints can be implemented as shown in the example above using
 /// the `#[table(unique(...))]` attribute, and specifying the fields on which
 /// the unique constraint should enforce uniqueness.
+/// 
+/// If you want to add a unique constraint on a single field, you can also add a `#[table(unique)]`
+/// attribute on one of the table struct's fields, for example:
+/// ```rust
+/// #[derive(Table)]
+/// pub struct Person {
+///     #[table(unique)]
+///     full_name: String,
+/// }
+/// ```
 ///
 /// You can create multiple unique constraints on a single table by adding
 /// multiple `#[table(unique(...))]` attributes to the table struct.

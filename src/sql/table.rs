@@ -31,6 +31,9 @@ pub struct TableField {
 
     /// Is this field the primary key?
     pub is_primary_key: bool,
+
+    /// Does this field have a unique constraint on it?
+    pub is_unique: bool,
     
     /// The name of the table which this field has a foreign key constraint to, if any.
     pub foreign_key_to_table_name: Option<&'static str>,
