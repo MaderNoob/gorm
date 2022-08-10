@@ -8,8 +8,9 @@ use gorm::{
     },
     statements::{
         DeleteStatementReturning, ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy,
-        InnerJoinTrait, LoadSingleColumnSqlStatment, LoadSqlStatment, OrderBy,
-        OrderBySelectedValue, SelectFrom, SelectValues, UpdateStatementReturning,
+        InnerJoinTrait, InsertStatementOnConflict, InsertStatementReturning,
+        LoadSingleColumnSqlStatment, LoadSqlStatment, OrderBy, OrderBySelectedValue, SelectFrom,
+        SelectValues, UpdateStatementReturning,
     },
     update_set, FromQueryResult,
 };
@@ -34,13 +35,18 @@ async fn main() -> anyhow::Result<()> {
         transaction.commit().await?;
     }
 
-    school::new { name: "Stanford" }.insert(&pool).await?;
+    school::new { name: "Stanford" }
+        .insert()
+        .execute(&pool)
+        .await?;
 
     let pet_id = pet::new_with_id {
         name: "Kitty",
         id: &5,
     }
-    .insert_returning_value(pet::id, &pool)
+    .insert()
+    .returning(pet::id)
+    .load_one_value(&pool)
     .await?;
 
     person::new {
@@ -49,7 +55,8 @@ async fn main() -> anyhow::Result<()> {
         school_id: &1,
         pet_id: &None,
     }
-    .insert(&pool)
+    .insert()
+    .execute(&pool)
     .await?;
 
     person::new {
@@ -58,7 +65,8 @@ async fn main() -> anyhow::Result<()> {
         school_id: &1,
         pet_id: &None,
     }
-    .insert(&pool)
+    .insert()
+    .execute(&pool)
     .await?;
 
     person::new {
@@ -67,8 +75,24 @@ async fn main() -> anyhow::Result<()> {
         school_id: &1,
         pet_id: &None,
     }
-    .insert(&pool)
+    .insert()
+    .execute(&pool)
     .await?;
+
+    let upserted_person = person::new_with_id {
+        id: &1,
+        name: "Dan",
+        age: &55,
+        school_id: &1,
+        pet_id: &None,
+    }
+    .insert()
+    .on_conflict(update_set!(person::name = "Dan"))
+    .returning(person::all)
+    .load_one::<Person>(&pool)
+    .await?;
+
+    println!("upserted person: {:?}", upserted_person);
 
     let inserted_person = person::new {
         name: "Jake",
@@ -76,7 +100,9 @@ async fn main() -> anyhow::Result<()> {
         school_id: &1,
         pet_id: &Some(pet_id),
     }
-    .insert_returning::<Person>(person::all, &pool)
+    .insert()
+    .returning(person::all)
+    .load_one::<Person>(&pool)
     .await?;
 
     println!("inserted person: {:?}", inserted_person);

@@ -1,15 +1,5 @@
-use deadpool_postgres::tokio_postgres::types::FromSqlOwned;
-
-use super::{FieldNameCharsConsListItem, FieldsConsListCons, ParameterBinder, SelectedValues};
-use crate::{
-    error::*,
-    execution::SqlStatementExecutor,
-    statements::{
-        ExecuteSqlStatment, InsertStatement, LoadSingleColumnSqlStatment, LoadSqlStatment,
-        ReturningInsertStatement,
-    },
-    FromQueryResult, Table, util::{TypedConsListNil, TypesNotEqual},
-};
+use super::ParameterBinder;
+use crate::{statements::EmptyInsertStatement, Table};
 
 /// A record type which can be inserted into the database.
 #[async_trait::async_trait]
@@ -34,51 +24,8 @@ pub trait Insertable: Sized {
     where
         's: 'a;
 
-    /// Inserts this record into the database.
-    async fn insert(self, to: &impl SqlStatementExecutor) -> Result<()> {
-        InsertStatement::new(self).execute(to).await?;
-
-        Ok(())
-    }
-
-    /// Inserts this record into the database, returning the selected values.
-    ///
-    /// The values can be selected using the [`returning!`] macro.
-    ///
-    /// [`returning!`]: crate::returning
-    async fn insert_returning<O: FromQueryResult + Send>(
-        self,
-        returning: impl SelectedValues<Self::Table, Fields = O::Fields> + Send + 'static,
-        to: &impl SqlStatementExecutor,
-    ) -> Result<O>
-    where
-        (O::Fields, TypedConsListNil): TypesNotEqual,
-    {
-        ReturningInsertStatement::new(self, returning)
-            .load_one(to)
-            .await
-    }
-
-
-    /// Inserts this record into the database, returning a single selected value.
-    ///
-    /// The value can be selected using the [`returning!`] macro.
-    ///
-    /// [`returning!`]: crate::returning
-    async fn insert_returning_value<
-        FieldName: FieldNameCharsConsListItem,
-        FieldType: FromSqlOwned + Send,
-    >(
-        self,
-        returning: impl SelectedValues<
-            Self::Table,
-            Fields = FieldsConsListCons<FieldName, FieldType, TypedConsListNil>,
-        > + Send
-        + 'static,
-        to: &impl SqlStatementExecutor,
-    ) -> Result<FieldType> {
-        ReturningInsertStatement::new(self, returning)
-            .load_one_value(to)
-            .await
+    /// Returns an insert statement for this record.
+    fn insert(self) -> EmptyInsertStatement<Self> {
+        EmptyInsertStatement::new(self)
     }
 }

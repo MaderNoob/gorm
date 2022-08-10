@@ -48,6 +48,7 @@ pub trait SqlStatement: Sized {
         let mut query_string = String::new();
         self.write_sql_string(&mut query_string, &mut parameter_binder)
             .unwrap();
+        println!("{}, {:?}", query_string, parameter_binder.parameters());
         (query_string, parameter_binder)
     }
 }
