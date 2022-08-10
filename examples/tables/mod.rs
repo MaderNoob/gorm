@@ -7,10 +7,10 @@ pub struct Person {
     name: String,
     age: i32,
 
-    #[table(foreign_key = "School")]
+    #[table(foreign_key(School))]
     school_id: i32,
 
-    #[table(foreign_key = "Pet")]
+    #[table(foreign_key(Pet))]
     pet_id: Option<i32>,
 }
 

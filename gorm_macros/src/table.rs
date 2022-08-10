@@ -105,7 +105,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     let table_marker = generate_table_marker(&table_struct_ident);
 
     let foreign_key_impls = fields.iter().filter_map(|field| {
-        let foreign_key_to_table_name = field.foreign_key.as_ref()?;
+        let foreign_key_to_table_name = field.foreign_key.to_table.as_ref()?;
 
         Some(generate_foreign_key_impl(
             &table_struct_ident,
@@ -210,7 +210,7 @@ struct TableInput {
 struct TableInputField {
     ident: Option<proc_macro2::Ident>,
     ty: Type,
-    foreign_key: Option<String>,
+    foreign_key: ForeignKeySpecification,
 }
 impl TableInputField {
     fn generate_table_field_struct(&self) -> proc_macro2::TokenStream {
@@ -230,12 +230,10 @@ impl TableInputField {
         let sql_type_name = quote! { #as_sql_type_trait::SQL_NAME };
         let is_null = quote! { <#as_sql_type_trait::IsNull as ::gorm::util::TypedBool>::VALUE };
 
-        let foreign_key_to_table_name = match &self.foreign_key {
-            Some(foreign_key_table_struct_name) => {
-                let foreign_key_table_struct_ident =
-                    proc_macro2::Ident::new(foreign_key_table_struct_name, self.ident.span());
+        let foreign_key_to_table_name = match &self.foreign_key.to_table {
+            Some(foreign_key_table_struct_path) => {
                 quote! {
-                    Some(<#foreign_key_table_struct_ident as ::gorm::Table>::TABLE_NAME)
+                    Some(<#foreign_key_table_struct_path as ::gorm::Table>::TABLE_NAME)
                 }
             },
             None => quote! { None },
@@ -250,6 +248,45 @@ impl TableInputField {
                 is_null: #is_null,
             }
         }
+    }
+}
+
+#[derive(Debug)]
+struct ForeignKeySpecification {
+    to_table: Option<syn::Path>,
+}
+impl FromMeta for ForeignKeySpecification {
+    fn from_list(items: &[syn::NestedMeta]) -> darling::Result<Self> {
+        if items.is_empty() {
+            return Err(darling::Error::custom(
+                "you must specify which table this foreign key constraint refers to",
+            ));
+        }
+        if items.len() > 1 {
+            return Err(darling::Error::custom(
+                "can't have a single foreign key column to multiple tables",
+            ));
+        }
+
+        let item = &items[0];
+
+        let err = darling::Error::custom("expected a table struct name").with_span(item);
+
+        let path = match item {
+            syn::NestedMeta::Meta(meta) => match meta {
+                syn::Meta::Path(path) => path,
+                _ => return Err(err),
+            },
+            _ => return Err(err),
+        };
+
+        Ok(Self {
+            to_table: Some(path.clone()),
+        })
+    }
+
+    fn from_none() -> Option<Self> {
+        Some(Self { to_table: None })
     }
 }
 
@@ -310,9 +347,7 @@ impl FromMeta for UniqueConstraintFieldsList {
 
             // make sure the provided field name is a valid identifier
             if syn::parse_str::<proc_macro2::Ident>(&field_name_string).is_err() {
-                return Err(darling::Error::custom(
-                    "expected a field name to be included in the unique constaint",
-                ));
+                return Err(darling::Error::custom("expected a field name"));
             }
 
             fields.push((field_name_string, nested_meta.span()))
@@ -356,15 +391,12 @@ fn generate_table_marker(table_struct_ident: &proc_macro2::Ident) -> proc_macro2
 fn generate_foreign_key_impl(
     table_struct_ident: &proc_macro2::Ident,
     table_name_ident: &proc_macro2::Ident,
-    other_table_name: &str,
+    other_table_path: &syn::Path,
     foreign_key_column_ident: &proc_macro2::Ident,
 ) -> proc_macro2::TokenStream {
-    let other_table_ident =
-        proc_macro2::Ident::new(other_table_name, foreign_key_column_ident.span());
-
     quote! {
         #[automatically_derived]
-        impl ::gorm::sql::HasForeignKey<#other_table_ident> for #table_struct_ident {
+        impl ::gorm::sql::HasForeignKey<#other_table_path> for #table_struct_ident {
             type ForeignKeyColumn = #table_name_ident::#foreign_key_column_ident;
         }
     }

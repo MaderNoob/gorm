@@ -102,7 +102,7 @@ pub fn returning(input_tokens: TokenStream) -> TokenStream {
 ///     id: i32,
 ///     name: String,
 ///     
-///     #[table(foreign_key = "School")]
+///     #[table(foreign_key(School))]
 ///     school_id: i32,
 /// }
 ///
@@ -146,7 +146,7 @@ pub fn migration(input_tokens: TokenStream) -> TokenStream {
 ///     id: i32,
 ///     name: String,
 ///     
-///     #[table(foreign_key = "School")]
+///     #[table(foreign_key(School))]
 ///     school_id: i32,
 /// }
 ///
@@ -181,7 +181,7 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 ///     last_name: String,
 ///     age: i32,
 ///
-///     #[table(foreign_key = "School")]
+///     #[table(foreign_key(School))]
 ///     school_id: i32,
 /// }
 ///
@@ -236,7 +236,7 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 /// # Foreign Keys
 ///
 /// Foreign keys can be implemented as shown in the example above using the
-/// `#[table(foreign_key = "...")]` attribute, and specifying the table struct's
+/// `#[table(foreign_key(...))]` attribute, and specifying the table struct's
 /// name.
 ///
 /// Foreign keys allow you to perform joins on the tables, and we can then
@@ -257,7 +257,7 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 /// struct MaybeStudent {
 ///     id: i32,
 ///
-///     #[table(foreign_key = "School")]
+///     #[table(foreign_key(School))]
 ///     school_id: Option<i32>,
 /// }
 /// ```
