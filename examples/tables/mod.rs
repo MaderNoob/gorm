@@ -1,6 +1,7 @@
 use gorm::{migration, Table};
 
 #[derive(Debug, Table)]
+#[table(unique(name, age))]
 pub struct Person {
     id: i32,
     name: String,

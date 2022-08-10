@@ -1,6 +1,9 @@
 use super::SqlStatement;
 use crate::{
-    sql::{FieldsConsListItem, Insertable, ParameterBinder, SelectedValues, UpdateSet},
+    sql::{
+        FieldsConsListItem, Insertable, ParameterBinder, SelectedValues, UniqueConstraint,
+        UpdateSet,
+    },
     util::{TypedBool, TypedConsListNil, TypedFalse, TypedTrue},
     Table,
 };
@@ -217,23 +220,86 @@ pub trait InsertStatementReturning: InsertStatement<HasReturningClause = TypedFa
 
 impl<T: InsertStatement<HasReturningClause = TypedFalse>> InsertStatementReturning for T {}
 
+/// A wrapper around an sql insert statement which allows adding an `ON
+/// CONFLICT` clause to it, by specifying the updates that should be performed
+/// on a conflicting row in case of conflict, using the
+/// [`InsertWithOnConflictClauseBuilder::do_update`] function.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`InsertStatementOnConflict::on_conflict`] function.
+pub struct InsertWithOnConflictClauseBuilder<
+    S: InsertStatement<HasOnConflictClause = TypedFalse>,
+    C: UniqueConstraint<Table = <S::Insertable as Insertable>::Table>,
+> {
+    statement: S,
+    constraint: C,
+}
+
+impl<
+    S: InsertStatement<HasOnConflictClause = TypedFalse>,
+    C: UniqueConstraint<Table = <S::Insertable as Insertable>::Table>,
+> InsertWithOnConflictClauseBuilder<S, C>
+{
+    /// Adds an update set to be applied to a conflicting row in case
+    /// of a conflict when inserting this value. To provide an update set to be
+    /// applied in case of a conflict, use the [`update_set!`] macro.
+    ///
+    /// [`update_set!`]: gorm_macros::update_set
+    pub fn do_update<U: UpdateSet<UpdateTable = <S::Insertable as Insertable>::Table>>(
+        self,
+        update_set: U,
+    ) -> InsertWithOnConflictClause<S, C, U> {
+        InsertWithOnConflictClause {
+            statement: self.statement,
+            _constraint: self.constraint,
+            update_set,
+        }
+    }
+}
+
+/// A trait which allows updating an existing row when a conflict occurs while
+/// trying to insert values into some table.
+pub trait InsertStatementOnConflict: InsertStatement<HasOnConflictClause = TypedFalse> {
+    /// Returns a builder for an on conflict clause, using a unique constraint
+    /// to detect the conflict.
+    ///
+    /// The returned builder allows specifying what updates should be performed
+    /// on the conflicting row in case of a conflict, by using the
+    /// [`InsertWithOnConflictClauseBuilder::do_update`] function.
+    fn on_conflict<C: UniqueConstraint<Table = <Self::Insertable as Insertable>::Table>>(
+        self,
+        constraint: C,
+    ) -> InsertWithOnConflictClauseBuilder<Self, C> {
+        InsertWithOnConflictClauseBuilder {
+            statement: self,
+            constraint,
+        }
+    }
+}
+
+impl<T: InsertStatement<HasOnConflictClause = TypedFalse>> InsertStatementOnConflict for T {}
+
 /// A wrapper around an sql insert statement which adds an `ON CONFLICT` clause
 /// to it.
 ///
 /// This wrapper shouldn't be used directly, you should instead use the
-/// [`InsertStatementOnConflict::on_conflict`] function.
+/// [`InsertStatementOnConflict::on_conflict`], and then the
+/// [`InsertWithOnConflictClauseBuilder::do_update`] functions.
 pub struct InsertWithOnConflictClause<
     S: InsertStatement<HasOnConflictClause = TypedFalse>,
+    C: UniqueConstraint<Table = <S::Insertable as Insertable>::Table>,
     U: UpdateSet<UpdateTable = <S::Insertable as Insertable>::Table>,
 > {
     statement: S,
+    _constraint: C,
     update_set: U,
 }
 
 impl<
     S: InsertStatement<HasOnConflictClause = TypedFalse>,
+    C: UniqueConstraint<Table = <S::Insertable as Insertable>::Table>,
     U: UpdateSet<UpdateTable = <S::Insertable as Insertable>::Table>,
-> InsertStatement for InsertWithOnConflictClause<S, U>
+> InsertStatement for InsertWithOnConflictClause<S, C, U>
 {
     type HasOnConflictClause = TypedTrue;
     type HasReturningClause = S::HasReturningClause;
@@ -265,36 +331,20 @@ impl<
     {
         use std::fmt::Write;
 
-        write!(f, " ON CONFLICT DO UPDATE SET ")?;
+        write!(
+            f,
+            " ON CONFLICT({}) DO UPDATE SET ",
+            C::FIELDS_COMMA_SEPERATED
+        )?;
         self.update_set.write_sql_string(f, parameter_binder)
     }
 }
 
 impl<
     S: InsertStatement<HasOnConflictClause = TypedFalse>,
+    C: UniqueConstraint<Table = <S::Insertable as Insertable>::Table>,
     U: UpdateSet<UpdateTable = <S::Insertable as Insertable>::Table>,
-> SqlStatement for InsertWithOnConflictClause<S, U>
+> SqlStatement for InsertWithOnConflictClause<S, C, U>
 {
     impl_sql_statement_for_insert_statement! {}
 }
-
-/// A trait which allows updating an existing row when a conflict occurs while
-/// trying to insert values into some table.
-pub trait InsertStatementOnConflict: InsertStatement<HasOnConflictClause = TypedFalse> {
-    /// Adds an update set to be applied to a conflicting row in case of a
-    /// conflict when inserting this value. To provide an update set to be applied in case of a
-    /// conflict, use the [`update_set!`] macro.
-    ///
-    /// [`update_set!`]: gorm_macros::update_set
-    fn on_conflict<U: UpdateSet<UpdateTable = <Self::Insertable as Insertable>::Table>>(
-        self,
-        update_set: U,
-    ) -> InsertWithOnConflictClause<Self, U> {
-        InsertWithOnConflictClause {
-            statement: self,
-            update_set,
-        }
-    }
-}
-
-impl<T: InsertStatement<HasOnConflictClause = TypedFalse>> InsertStatementOnConflict for T {}

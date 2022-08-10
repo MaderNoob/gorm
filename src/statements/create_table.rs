@@ -1,7 +1,7 @@
 use std::{fmt::Write, marker::PhantomData};
 
 use crate::{
-    sql::{ParameterBinder, Table, TableField},
+    sql::{ParameterBinder, Table, TableField, TableUniqueConstraint},
     statements::SqlStatement,
     util::TypedConsListNil,
 };
@@ -38,7 +38,7 @@ impl<T: Table> SqlStatement for CreateTableStatement<T> {
         's: 'a,
     {
         write!(f, "CREATE TABLE {} (", T::TABLE_NAME,)?;
-        generate_create_table_columns_sql_string(T::FIELDS, f);
+        generate_create_table_content_sql_string(T::FIELDS, T::UNIQUE_CONSTRAINTS, f);
         f.push(')');
 
         Ok(())
@@ -65,17 +65,18 @@ impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
         's: 'a,
     {
         write!(f, "CREATE TABLE IF NOT EXISTS {} (", T::TABLE_NAME,)?;
-        generate_create_table_columns_sql_string(T::FIELDS, f);
+        generate_create_table_content_sql_string(T::FIELDS, T::UNIQUE_CONSTRAINTS, f);
         f.push(')');
 
         Ok(())
     }
 }
 
-/// Converts the fields of the table to an sql string representing the columns
-/// of the table.
-fn generate_create_table_columns_sql_string(
+/// Generates the an sql string representing the content of this table, including columns, foreign
+/// keys and unique constraints.
+fn generate_create_table_content_sql_string(
     fields: &[TableField],
+    unique_constraints: &[TableUniqueConstraint],
     write_fields_string_into: &mut String,
 ) {
     for field_info in fields {
@@ -96,6 +97,22 @@ fn generate_create_table_columns_sql_string(
         }
 
         write_fields_string_into.push(',');
+    }
+
+    for unique_constraint in unique_constraints{
+        write_fields_string_into.push_str("UNIQUE(");
+        for field in unique_constraint.fields{
+            write_fields_string_into.push_str(field);
+            write_fields_string_into.push(',');
+        }
+
+        // remove the trailing comma
+        if write_fields_string_into.ends_with(',') {
+            write_fields_string_into.pop();
+        }
+
+        // close the parentheses and add a comma for the next unique constraint.
+        write_fields_string_into.push_str("),");
     }
 
     // remove the trailing comma

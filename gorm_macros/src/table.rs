@@ -1,5 +1,7 @@
+use std::collections::HashSet;
+
 use convert_case::{Case, Casing};
-use darling::{ast::Fields, FromDeriveInput, FromField};
+use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta};
 use itertools::Itertools;
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
@@ -9,13 +11,18 @@ use crate::util::{generate_field_name_cons_list_type, generate_fields_cons_list_
 
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input_tokens as DeriveInput);
-    let input = TableInput::from_derive_input(&derive_input).unwrap();
+    let parse_input_result = TableInput::from_derive_input(&derive_input);
+    let input = match parse_input_result {
+        Ok(input) => input,
+        Err(err) => return err.write_errors().into(),
+    };
     let TableInput {
         ident: table_struct_ident,
         generics,
         data,
         vis,
         table_name: optional_table_name,
+        unique: unique_constraints,
     } = input;
 
     let table_name =
@@ -54,6 +61,29 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         .into();
     }
 
+    // make sure that the unique constraints are all referring to valid fields.
+    let field_names_strings_set: HashSet<String> = fields
+        .iter()
+        .map(|field| field.ident.as_ref().unwrap().to_string())
+        .collect();
+    for unique_constraint in &unique_constraints {
+        // if the unique constraint doesn't mention any field names
+        if unique_constraint.fields.is_empty() {
+            // return quote_spanned!{}
+        }
+
+        for (field_name, span) in &unique_constraint.fields {
+            // if there is no such field
+            if !field_names_strings_set.contains(field_name) {
+                let span = span.clone();
+                return quote_spanned! {
+                    span => compile_error!("no such field"),
+                }
+                .into();
+            }
+        }
+    }
+
     let field_names = fields.iter().map(|field| &field.ident);
     let table_field_structs = fields
         .iter()
@@ -85,10 +115,18 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         ))
     });
 
+    let unique_constraint_structs = unique_constraints
+        .iter()
+        .map(|unique_constraint| unique_constraint.generate_table_unique_constraint_struct());
+
     let insertables = implement_insertables(&table_struct_ident, &fields);
 
     let all_fields_selected_struct =
         implement_all_fields_selected_struct(&fields_type, &table_struct_ident, &table_name);
+
+    let unique_constraint_marker_structs = unique_constraints.iter().map(|unique_constraint| {
+        unique_constraint.generate_unique_constraint_marker_struct(&table_struct_ident)
+    });
 
     quote! {
         #[automatically_derived]
@@ -96,6 +134,9 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             type Fields = #fields_type;
             const FIELDS: &'static [::gorm::sql::TableField] = &[
                 #( #table_field_structs ),*
+            ];
+            const UNIQUE_CONSTRAINTS: &'static [::gorm::sql::TableUniqueConstraint] = &[
+                # ( #unique_constraint_structs ),*
             ];
             const TABLE_NAME: &'static ::std::primitive::str = #table_name;
             type IdColumn = #table_name_ident::id;
@@ -132,6 +173,20 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             #insertables
 
             #all_fields_selected_struct
+
+            pub mod unique_constraints {
+                pub struct id;
+
+                #[automatically_derived]
+                impl ::gorm::sql::UniqueConstraint for id {
+                    type Table = super::super::#table_struct_ident;
+                    const FIELDS_COMMA_SEPERATED:&'static str = "id";
+                }
+
+                #(
+                    #unique_constraint_marker_structs
+                )*
+            }
         }
     }
     .into()
@@ -145,6 +200,9 @@ struct TableInput {
     vis: syn::Visibility,
     data: darling::ast::Data<(), TableInputField>,
     table_name: Option<String>,
+
+    #[darling(multiple)]
+    unique: Vec<UniqueConstraintFieldsList>,
 }
 
 #[derive(Debug, FromField)]
@@ -192,6 +250,74 @@ impl TableInputField {
                 is_null: #is_null,
             }
         }
+    }
+}
+
+#[derive(Debug)]
+struct UniqueConstraintFieldsList {
+    fields: Vec<(String, proc_macro2::Span)>,
+}
+impl UniqueConstraintFieldsList {
+    fn generate_table_unique_constraint_struct(&self) -> proc_macro2::TokenStream {
+        let field_name_strings = self
+            .fields
+            .iter()
+            .map(|(field_name, _span)| field_name.as_str());
+        quote! {
+            ::gorm::sql::TableUniqueConstraint {
+                fields: &[#(#field_name_strings),*],
+            }
+        }
+    }
+
+    fn generate_unique_constraint_marker_struct(
+        &self,
+        table_struct_ident: &proc_macro2::Ident,
+    ) -> proc_macro2::TokenStream {
+        let struct_name_string = self
+            .fields
+            .iter()
+            .map(|(field_name, _span)| field_name.as_str())
+            .join("_");
+        let struct_name_ident =
+            proc_macro2::Ident::new(&struct_name_string, proc_macro2::Span::call_site());
+        let fields_comma_seperated = self
+            .fields
+            .iter()
+            .map(|(field_name, _span)| field_name.as_str())
+            .join(",");
+        quote! {
+            pub struct #struct_name_ident;
+
+            #[automatically_derived]
+            impl ::gorm::sql::UniqueConstraint for #struct_name_ident {
+                type Table = super::super::#table_struct_ident;
+                const FIELDS_COMMA_SEPERATED:&'static str = #fields_comma_seperated;
+            }
+        }
+    }
+}
+impl FromMeta for UniqueConstraintFieldsList {
+    fn from_list(items: &[syn::NestedMeta]) -> darling::Result<Self> {
+        if items.is_empty() {
+            return Err(darling::Error::custom(
+                "the unique constraint fields list can't be empty, please specify a list of fields to be included in this unique constraint",
+            ));
+        }
+        let mut fields = Vec::with_capacity(items.len());
+        for nested_meta in items {
+            let field_name_string = quote! {#nested_meta}.to_string();
+
+            // make sure the provided field name is a valid identifier
+            if syn::parse_str::<proc_macro2::Ident>(&field_name_string).is_err() {
+                return Err(darling::Error::custom(
+                    "expected a field name to be included in the unique constaint",
+                ));
+            }
+
+            fields.push((field_name_string, nested_meta.span()))
+        }
+        Ok(Self { fields })
     }
 }
 
@@ -286,6 +412,7 @@ fn implement_insertable_with_fields(
             /// A struct which allows inserting new records into the table.
             pub struct #insertable_struct_name_ident;
 
+            #[automatically_derived]
             impl ::gorm::sql::Insertable for #insertable_struct_name_ident
             {
                 type Table = super::#table_struct_ident;

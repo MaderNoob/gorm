@@ -174,9 +174,12 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 /// # Example
 /// ```rust
 /// #[derive(Table)]
+/// #[table(unique(first_name, last_name))]
 /// struct Person {
 ///     id: i32,
-///     name: String,
+///     first_name: String,
+///     last_name: String,
+///     age: i32,
 ///
 ///     #[table(foreign_key = "School")]
 ///     school_id: i32,
@@ -221,8 +224,14 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 ///
 ///  - An empty struct for each column in the table. For example in the above
 ///    example, the created structs
-///  will be `person::id`, `person::name` and `person::age`. Each of these
-/// structs implement the  `SqlExpression` trait.
+///  will be `person::id`, `person::first_name`, `person::last_name`,
+/// `person::age` and  `person::school_id`. Each of these structs implement the
+/// `SqlExpression` trait.
+///
+///  - A module named `unique_constraints` containing marker structs for each
+///    unique constraint on the table. For example in the above example, the
+///    created structs will be `person::unique_constraints::id` and
+///    `person::unique_constraints::first_name_last_name`.
 ///
 /// # Foreign Keys
 ///
@@ -258,6 +267,35 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 ///
 /// Please note that the type of the foreign key field must match the type of
 /// the referenced table's `id` field.
+///
+/// # Unique Constraints
+///
+/// Unique constraints can be implemented as shown in the example above using
+/// the `#[table(unique(...))]` attribute, and specifying the fields on which
+/// the unique constraint should enforce uniqueness.
+///
+/// You can create multiple unique constraints on a single table by adding
+/// multiple `#[table(unique(...))]` attributes to the table struct.
+///
+/// A unique constraint for the id field is automatically created.
+///
+/// Unique constraints allow you to use `ON CONFLICT` clauses, and to perform
+/// upserts, for example, for the above snippet, we can do the following:
+///
+/// ```rust
+/// let upserted_person = person::new {
+///     first_name: "James",
+///     last_name: "Brown",
+///     age: &44,
+///     school_id: &2,
+/// }
+/// .insert()
+/// .on_conflict(person::unique_constraints::first_name_last_name)
+/// .do_update(update_set!(person::school_id = 2))
+/// .returning(person::all)
+/// .load_one::<Person>(...)
+/// .await?;
+/// ```
 #[proc_macro_derive(Table, attributes(table))]
 pub fn table(input_tokens: TokenStream) -> TokenStream {
     table::table(input_tokens)
@@ -291,8 +329,8 @@ pub fn selected_value_to_order_by(input_tokens: TokenStream) -> TokenStream {
 /// This macro allows providing a set of updates to perform on each row in an
 /// sql update statement.
 ///
-/// The input to this macro should be a comma seperated list of assignments of sql expressions to
-/// columns, for example:
+/// The input to this macro should be a comma seperated list of assignments of
+/// sql expressions to columns, for example:
 ///
 /// # Example
 /// ```rust

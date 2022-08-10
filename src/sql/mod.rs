@@ -14,6 +14,7 @@ mod sql_functions;
 mod table;
 mod types;
 mod update_set;
+mod unique_constraint;
 
 pub use bound_parameters::*;
 pub use condition::*;
@@ -29,3 +30,4 @@ pub use sql_functions::*;
 pub use table::*;
 pub use types::*;
 pub use update_set::*;
+pub use unique_constraint::*;

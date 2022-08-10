@@ -40,6 +40,12 @@ async fn main() -> anyhow::Result<()> {
         .execute(&pool)
         .await?;
 
+    let second_school = school::new { name: "Marble Hills School" }
+        .insert()
+        .returning(school::id)
+        .load_one_value(&pool)
+        .await?;
+
     let pet_id = pet::new_with_id {
         name: "Kitty",
         id: &5,
@@ -79,15 +85,15 @@ async fn main() -> anyhow::Result<()> {
     .execute(&pool)
     .await?;
 
-    let upserted_person = person::new_with_id {
-        id: &1,
-        name: "Dan",
-        age: &55,
-        school_id: &1,
+    let upserted_person = person::new {
+        name: "James",
+        age: &44,
+        school_id: &second_school,
         pet_id: &None,
     }
     .insert()
-    .on_conflict(update_set!(person::name = "Dan"))
+    .on_conflict(person::unique_constraints::name_age)
+    .do_update(update_set!(person::school_id = second_school))
     .returning(person::all)
     .load_one::<Person>(&pool)
     .await?;

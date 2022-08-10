@@ -14,6 +14,9 @@ pub trait Table: Sized + 'static {
     /// Information about each field in the table.
     const FIELDS: &'static [TableField];
 
+    /// Information about each unique constraint in the table.
+    const UNIQUE_CONSTRAINTS: &'static [TableUniqueConstraint];
+
     /// The name of the table as a string.
     const TABLE_NAME: &'static str;
 
@@ -37,6 +40,12 @@ pub struct TableField {
 
     /// Is this field nullable?
     pub is_null: bool,
+}
+
+/// Information about a unique constraint of a table struct.
+pub struct TableUniqueConstraint {
+    /// The fields of this unique constraint
+    pub fields: &'static [&'static str],
 }
 
 /// A column of a table
