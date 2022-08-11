@@ -1,7 +1,7 @@
 [package]
 name = "gorm_macros"
 authors = ["Roee Shoshani"]
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "An orm that is simple to use and prevents all mistakes at compile time"
 repository = "https://github.com/MaderNoob/gorm"
