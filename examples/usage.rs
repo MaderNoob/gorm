@@ -4,7 +4,7 @@ use gorm::{
     sql::{
         self, AddableSqlExpression, BooleanAndableSqlExpression, BooleanOrableSqlExpression,
         Insertable, LikeableSqlExpression, Migration, MultipliableSqlExpression,
-        OrderableSqlExpression, SqlExpression, SummableSqlExpression, TableMarker,
+        OrderableSqlExpression, SqlExpression, TableMarker,
     },
     statements::{
         DeleteStatementReturning, ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy,
@@ -25,6 +25,10 @@ async fn main() -> anyhow::Result<()> {
 
     // it is recommended to scope the lifetime of a client we get from the pool, so
     // that the client will be returned to the pool as soon as possible.
+    //
+    // there isn't really any point in using a transaction here, but this is just to
+    // show how to get connections from connection pools, and how to use
+    // transactions.
     {
         let mut client = pool.get().await?;
         let transaction = client.begin_transaction().await?;
@@ -107,7 +111,21 @@ async fn main() -> anyhow::Result<()> {
     .load_one::<Person>(&pool)
     .await?;
 
-    println!("upserted person: {:?}", upserted_person);
+    // try insert, and if there is a conflict, do nothing
+    let person_if_no_conflict_occured = person::new {
+        name: "James",
+        age: &44,
+        school_id: &second_school,
+        first_pet_id: &None,
+        second_pet_id: &None,
+    }
+    .insert()
+    .on_conflict_do_nothing()
+    .returning(person::all)
+    .load_optional::<Person>(&pool)
+    .await?;
+
+    println!("person if no conflict occured: {:?}", person_if_no_conflict_occured);
 
     let inserted_person = person::new {
         name: "Jake",

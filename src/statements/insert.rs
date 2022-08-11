@@ -275,6 +275,16 @@ pub trait InsertStatementOnConflict: InsertStatement<HasOnConflictClause = Typed
             constraint,
         }
     }
+
+    /// Adds an `ON CONFLICT DO NOTHING` clause to this insert statement, which
+    /// means that if any conflict occurs while inserting this record,
+    /// nothing will happen and no error will be returned.
+    ///
+    /// Please note that adding this `ON CONFLICT DO NOTHING` clause also means that in case of a
+    /// conflict, this statement won't return any rows.
+    fn on_conflict_do_nothing(self) -> InsertWithOnConflictDoNothingClause<Self> {
+        InsertWithOnConflictDoNothingClause { statement: self }
+    }
 }
 
 impl<T: InsertStatement<HasOnConflictClause = TypedFalse>> InsertStatementOnConflict for T {}
@@ -345,6 +355,59 @@ impl<
     C: UniqueConstraint<Table = <S::Insertable as Insertable>::Table>,
     U: UpdateSet<UpdateTable = <S::Insertable as Insertable>::Table>,
 > SqlStatement for InsertWithOnConflictClause<S, C, U>
+{
+    impl_sql_statement_for_insert_statement! {}
+}
+
+/// A wrapper around an sql insert statement which adds an `ON CONFLICT DO
+/// NOTHING` clause to it.
+///
+/// This wrapper shouldn't be used directly, you should instead use the
+/// [`InsertStatementOnConflict::on_conflict_do_nothing`] function.
+pub struct InsertWithOnConflictDoNothingClause<S: InsertStatement<HasOnConflictClause = TypedFalse>>
+{
+    statement: S,
+}
+
+impl<S: InsertStatement<HasOnConflictClause = TypedFalse>> InsertStatement
+    for InsertWithOnConflictDoNothingClause<S>
+{
+    type HasOnConflictClause = TypedTrue;
+    type HasReturningClause = S::HasReturningClause;
+    type Insertable = S::Insertable;
+    type OutputFields = S::OutputFields;
+
+    fn get_insertable(&self) -> &Self::Insertable {
+        self.statement.get_insertable()
+    }
+
+    fn write_returning_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        self.statement.write_returning_clause(f, parameter_binder)
+    }
+
+    fn write_on_conflict_clause<'s, 'a>(
+        &'s self,
+        f: &mut String,
+        _parameter_binder: &mut ParameterBinder<'a>,
+    ) -> std::fmt::Result
+    where
+        's: 'a,
+    {
+        use std::fmt::Write;
+
+        write!(f, " ON CONFLICT DO NOTHING")
+    }
+}
+
+impl<S: InsertStatement<HasOnConflictClause = TypedFalse>> SqlStatement
+    for InsertWithOnConflictDoNothingClause<S>
 {
     impl_sql_statement_for_insert_statement! {}
 }
