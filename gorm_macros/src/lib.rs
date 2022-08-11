@@ -248,7 +248,7 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 /// let _ = person::table.inner_join(school::table)
 ///     .find()
 ///     .filter(school::name.equals("Stanford"))
-///     .load::<Person>(...)
+///     .load_all::<Person>(...)
 ///     .await?;
 /// ```
 ///
@@ -265,6 +265,33 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 ///
 /// The inner join of the table `MaybeStudent` with the table `School` will then
 /// only return the students who's `school_id` is not `None`.
+///
+/// A single table can also have multiple foreign keys to the same table, for example:
+///
+/// ```rust
+/// #[derive(Table)]
+/// pub struct Student {
+///     id: i32,
+///
+///     #[table(foreign_key(School))]
+///     elementary_school: i32,
+///
+///     #[table(foreign_key(School))]
+///     university: i32,
+/// }
+/// ```
+///
+/// If you then want to perform an inner join from `Student` to `School`, you will have to use the
+/// `inner_join_on_column` function instead of just using the `inner_join` function, because you
+/// must explicitly tell the orm which column you want to perform the join on, for example:
+///
+/// ```rust
+/// let _ = student::table.inner_join_on_column(student::university, school::table)
+///     .find()
+///     .filter(school::name.equals("Stanford"))
+///     .load_all::<Student>(...)
+///     .await?;
+/// ```
 ///
 /// Please note that the type of the foreign key field must match the type of
 /// the referenced table's `id` field.
