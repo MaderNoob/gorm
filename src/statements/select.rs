@@ -3,9 +3,10 @@ use std::{fmt::Write, marker::PhantomData};
 use super::SqlStatement;
 use crate::{
     sql::{
-        Column, CombineSelectableTables, CombinedSelectableTables, FieldNameCharsConsListItem,
-        FieldsConsListItem, HasForeignKey, ParameterBinder, SelectableTables, SelectedValues,
-        SelectedValuesContainsFieldWithName, SqlBool, SqlExpression, SqlType, Table, TableMarker,
+        Column, ColumnIsForeignKey, CombineSelectableTables, CombinedSelectableTables,
+        FieldNameCharsConsListItem, FieldsConsListItem, ParameterBinder, SelectableTables,
+        SelectedValues, SelectedValuesContainsFieldWithName, SqlBool, SqlExpression, SqlType,
+        Table, TableHasOneForeignKey, TableMarker,
     },
     util::{TypedBool, TypedFalse, TypedTrue, TypesEqual},
 };
@@ -835,31 +836,50 @@ impl<T: TableMarker> SelectFrom for T {
 }
 
 /// Represents the inner join of 2 selection sources.
-pub struct InnerJoined<A: SelectFrom, B: SelectFrom>(PhantomData<A>, PhantomData<B>)
+pub struct InnerJoined<
+    A: SelectFrom,
+    B: SelectFrom,
+    C: Column<Table = A::LeftMostTable> + ColumnIsForeignKey<B::LeftMostTable>,
+>(PhantomData<A>, PhantomData<B>, PhantomData<C>)
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
-    A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
-    (<<<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual;
+    (
+        <<C as Column>::SqlType as SqlType>::NonNullSqlType,
+        <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType,
+    ): TypesEqual;
 
-impl<A: SelectFrom, B: SelectFrom> InnerJoined<A, B>
+impl<
+    A: SelectFrom,
+    B: SelectFrom,
+    C: Column<Table = A::LeftMostTable> + ColumnIsForeignKey<B::LeftMostTable>,
+> InnerJoined<A, B, C>
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
-    A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
-    (<<<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
+    (
+        <<C as Column>::SqlType as SqlType>::NonNullSqlType,
+        <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType,
+    ): TypesEqual,
 {
-    /// Creates a new source which represents the inner join of 2 selection sources.
+    /// Creates a new source which represents the inner join of 2 selection
+    /// sources.
     pub fn new() -> Self {
-        Self(PhantomData, PhantomData)
+        Self(PhantomData, PhantomData, PhantomData)
     }
 }
 
 // We can select from an inner joined source if there is a foreign key
 // constraint using which we can join the 2 sources.
-impl<A: SelectFrom, B: SelectFrom> SelectFrom for InnerJoined<A, B>
+impl<
+    A: SelectFrom,
+    B: SelectFrom,
+    C: Column<Table = A::LeftMostTable> + ColumnIsForeignKey<B::LeftMostTable>,
+> SelectFrom for InnerJoined<A, B, C>
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
-    A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
-    (<<<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
+    (
+        <<C as Column>::SqlType as SqlType>::NonNullSqlType,
+        <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType,
+    ): TypesEqual,
 {
     type LeftMostTable = A::LeftMostTable;
     type SelectableTables = CombinedSelectableTables<A::SelectableTables, B::SelectableTables>;
@@ -875,7 +895,7 @@ where
             " INNER JOIN \"{}\" ON \"{}\".\"{}\" = \"{}\".\"id\"",
             B::LeftMostTable::TABLE_NAME,
             A::LeftMostTable::TABLE_NAME,
-            <<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::COLUMN_NAME,
+            <C as Column>::COLUMN_NAME,
             B::LeftMostTable::TABLE_NAME
         )?;
 
@@ -883,18 +903,45 @@ where
     }
 }
 
-/// A trait which allows inner joining 2 selection sources using foreign keys.
+/// A trait which allows inner joining 2 selection sources using a foreign key.
 pub trait InnerJoinTrait: Sized + SelectFrom {
     /// Inner joins this selection source with another selection source, if this
     /// source has a foreign key to the other one.
-    fn inner_join<S: SelectFrom>(self, _with: S) -> InnerJoined<Self, S>
+    fn inner_join<S: SelectFrom>(self, _with: S) -> InnerJoined<Self, S, <Self::LeftMostTable as TableHasOneForeignKey<S::LeftMostTable>>::ForeignKeyColumn>
     where
-        Self::LeftMostTable: HasForeignKey<S::LeftMostTable>,
+        Self::LeftMostTable: TableHasOneForeignKey<S::LeftMostTable>,
         <Self as SelectFrom>::SelectableTables: CombineSelectableTables<<S as SelectFrom>::SelectableTables>,
-        (<<<Self::LeftMostTable as HasForeignKey<S::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<S::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
+        (<<<Self::LeftMostTable as TableHasOneForeignKey<S::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<S::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual
     {
         InnerJoined::new()
     }
 }
 
 impl<S: SelectFrom> InnerJoinTrait for S {}
+
+/// A trait which allows inner joining 2 selection sources using a foreign keys
+/// on a specific column.
+pub trait InnerJoinOnTrait: Sized + SelectFrom {
+    /// Inner joins this selection source with another selection source, if this
+    /// source has a foreign key to the other one.
+    fn inner_join_on_column<
+        S: SelectFrom,
+        C: Column<Table = Self::LeftMostTable> + ColumnIsForeignKey<S::LeftMostTable>,
+    >(
+        self,
+        _column: C,
+        _with: S,
+    ) -> InnerJoined<Self, S, C>
+    where
+        <Self as SelectFrom>::SelectableTables:
+            CombineSelectableTables<<S as SelectFrom>::SelectableTables>,
+        (
+            <<C as Column>::SqlType as SqlType>::NonNullSqlType,
+            <<S::LeftMostTable as Table>::IdColumn as Column>::SqlType,
+        ): TypesEqual,
+    {
+        InnerJoined::new()
+    }
+}
+
+impl<S: SelectFrom> InnerJoinOnTrait for S {}

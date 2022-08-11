@@ -8,7 +8,7 @@ use gorm::{
     },
     statements::{
         DeleteStatementReturning, ExecuteSqlStatment, Filter, FilterDeleteStatement, GroupBy,
-        InnerJoinTrait, InsertStatementOnConflict, InsertStatementReturning,
+        InnerJoinOnTrait, InnerJoinTrait, InsertStatementOnConflict, InsertStatementReturning,
         LoadSingleColumnSqlStatment, LoadSqlStatment, OrderBy, OrderBySelectedValue, SelectFrom,
         SelectValues, UpdateStatementReturning,
     },
@@ -64,7 +64,8 @@ async fn main() -> anyhow::Result<()> {
         name: "James",
         age: &44,
         school_id: &1,
-        pet_id: &None,
+        first_pet_id: &None,
+        second_pet_id: &None,
     }
     .insert()
     .execute(&pool)
@@ -74,7 +75,8 @@ async fn main() -> anyhow::Result<()> {
         name: "Harry",
         age: &33,
         school_id: &1,
-        pet_id: &None,
+        first_pet_id: &None,
+        second_pet_id: &None,
     }
     .insert()
     .execute(&pool)
@@ -84,7 +86,8 @@ async fn main() -> anyhow::Result<()> {
         name: "David",
         age: &34,
         school_id: &1,
-        pet_id: &None,
+        first_pet_id: &None,
+        second_pet_id: &None,
     }
     .insert()
     .execute(&pool)
@@ -94,7 +97,8 @@ async fn main() -> anyhow::Result<()> {
         name: "James",
         age: &44,
         school_id: &second_school,
-        pet_id: &None,
+        first_pet_id: &None,
+        second_pet_id: &None,
     }
     .insert()
     .on_conflict(person::unique_constraints::name_age)
@@ -109,7 +113,8 @@ async fn main() -> anyhow::Result<()> {
         name: "Jake",
         age: &29,
         school_id: &1,
-        pet_id: &Some(inserted_pet.id),
+        first_pet_id: &Some(inserted_pet.id),
+        second_pet_id: &None,
     }
     .insert()
     .returning(person::all)
@@ -195,7 +200,7 @@ async fn main() -> anyhow::Result<()> {
     // this shows how you can perform inner joins on optional foreign keys, which
     // will return only the records whose foreign key column isn't `NULL`.
     let person_and_pet_names = person::table
-        .inner_join(pet::table)
+        .inner_join_on_column(person::first_pet_id, pet::table)
         .find()
         .select(select_values!(person::name, pet::name as pet_name))
         .load_all::<PersonAndPetName>(&pool)

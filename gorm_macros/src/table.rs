@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use convert_case::{Case, Casing};
 use darling::{ast::Fields, util::Flag, FromDeriveInput, FromField, FromMeta};
@@ -104,16 +104,44 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     let table_marker = generate_table_marker(&table_struct_ident);
 
-    let foreign_key_impls = fields.iter().filter_map(|field| {
-        let foreign_key_to_table_name = field.foreign_key.to_table.as_ref()?;
+    // if this table has only 1 foreign key column to some other table, we can
+    // implement the `TableHasOneForeignKey` trait for it.
+    struct ForeignKeyCounter {
+        table_struct_ident: proc_macro2::Ident,
+        field_ident: proc_macro2::Ident,
+        amount: usize,
+    }
+    let mut foreign_keys_amount_for_each_table = HashMap::new();
+    for field in fields.iter() {
+        let to_table = match field.foreign_key.to_table.as_ref() {
+            Some(v) => v,
+            None => continue,
+        };
+        let table_name_string = to_table.to_string();
+        foreign_keys_amount_for_each_table
+            .entry(table_name_string)
+            .or_insert_with(|| ForeignKeyCounter {
+                table_struct_ident: to_table.clone(),
+                field_ident: field.ident.as_ref().unwrap().clone(),
+                amount: 0,
+            })
+            .amount += 1;
+    }
+    let table_foreign_key_impls = foreign_keys_amount_for_each_table
+        .iter()
+        .filter(|(_, counter)| counter.amount == 1)
+        .map(|(_, counter)| {
+            generate_table_has_one_foreign_key_impl(
+                &table_struct_ident,
+                &table_name_ident,
+                &counter.table_struct_ident,
+                &counter.field_ident,
+            )
+        });
 
-        Some(generate_foreign_key_impl(
-            &table_struct_ident,
-            &table_name_ident,
-            foreign_key_to_table_name,
-            field.ident.as_ref().unwrap(),
-        ))
-    });
+    let column_foreign_key_impls = fields
+        .iter()
+        .filter_map(|field| field.generate_column_foreign_key_impl());
 
     let unique_constraint_structs = unique_constraints
         .iter()
@@ -169,7 +197,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
         }
 
         #(
-            #foreign_key_impls
+            #table_foreign_key_impls
          )*
 
         #[allow(non_camel_case_types)]
@@ -178,7 +206,11 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
             #(
                 #column_structs
-             )*
+            )*
+
+            #(
+                #column_foreign_key_impls
+            )*
 
             #table_marker
 
@@ -299,11 +331,19 @@ impl TableInputField {
             }
         })
     }
+
+    fn generate_column_foreign_key_impl(&self) -> Option<proc_macro2::TokenStream> {
+        let to_table = self.foreign_key.to_table.as_ref()?;
+        let field_name_ident = self.ident.as_ref().unwrap();
+        Some(quote! {
+            impl ::gorm::sql::ColumnIsForeignKey<#to_table> for #field_name_ident { }
+        })
+    }
 }
 
 #[derive(Debug)]
 struct ForeignKeySpecification {
-    to_table: Option<syn::Path>,
+    to_table: Option<proc_macro2::Ident>,
 }
 impl FromMeta for ForeignKeySpecification {
     fn from_list(items: &[syn::NestedMeta]) -> darling::Result<Self> {
@@ -330,8 +370,10 @@ impl FromMeta for ForeignKeySpecification {
             _ => return Err(err),
         };
 
+        let ident = path.get_ident().ok_or(err)?;
+
         Ok(Self {
-            to_table: Some(path.clone()),
+            to_table: Some(ident.clone()),
         })
     }
 
@@ -438,15 +480,15 @@ fn generate_table_marker(table_struct_ident: &proc_macro2::Ident) -> proc_macro2
     }
 }
 
-fn generate_foreign_key_impl(
+fn generate_table_has_one_foreign_key_impl(
     table_struct_ident: &proc_macro2::Ident,
     table_name_ident: &proc_macro2::Ident,
-    other_table_path: &syn::Path,
+    other_table_path: &proc_macro2::Ident,
     foreign_key_column_ident: &proc_macro2::Ident,
 ) -> proc_macro2::TokenStream {
     quote! {
         #[automatically_derived]
-        impl ::gorm::sql::HasForeignKey<#other_table_path> for #table_struct_ident {
+        impl ::gorm::sql::TableHasOneForeignKey<#other_table_path> for #table_struct_ident {
             type ForeignKeyColumn = #table_name_ident::#foreign_key_column_ident;
         }
     }

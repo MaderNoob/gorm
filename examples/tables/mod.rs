@@ -11,7 +11,10 @@ pub struct Person {
     pub school_id: i32,
 
     #[table(foreign_key(Pet))]
-    pub pet_id: Option<i32>,
+    pub first_pet_id: Option<i32>,
+
+    #[table(foreign_key(Pet))]
+    pub second_pet_id: Option<i32>,
 }
 
 #[derive(Debug, Table)]

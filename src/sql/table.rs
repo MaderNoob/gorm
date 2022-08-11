@@ -71,6 +71,17 @@ pub trait Column {
     type RustType: IntoSqlType<SqlType = Self::SqlType>;
 }
 
+/// A marker trait indicating that some column is a foreign key to another
+/// table.
+pub trait ColumnIsForeignKey<T: Table>: Column
+where
+    (
+        <Self::SqlType as SqlType>::NonNullSqlType,
+        <T::IdColumn as Column>::SqlType,
+    ): TypesEqual,
+{
+}
+
 /// A trait for representing a table marker, which is an empty struct type which
 /// is used to reference some table.
 pub trait TableMarker: Sized + 'static {
@@ -99,7 +110,7 @@ pub trait TableMarker: Sized + 'static {
 }
 
 /// Indicates that some table has a foreign key to some other table
-pub trait HasForeignKey<T: Table>: Table
+pub trait TableHasOneForeignKey<T: Table>: Table
 where
     (
         <<Self::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType,
@@ -107,5 +118,5 @@ where
     ): TypesEqual,
 {
     /// The column which contains the foreign key.
-    type ForeignKeyColumn: Column;
+    type ForeignKeyColumn: Column<Table = Self> + ColumnIsForeignKey<T>;
 }

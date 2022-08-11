@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use super::{
     AverageableSqlType, SqlAdd, SqlAddition, SqlAverage, SqlConditionLike, SqlConditionNotLike,
-    SqlCount, SqlDivide, SqlDivision, SqlEnum, SqlMax, SqlMultiplication, SqlMultiply, SqlSubtract,
+    SqlCount, SqlDivide, SqlDivision, SqlMax, SqlMultiplication, SqlMultiply, SqlSubtract,
     SqlSubtraction, SqlSum, SummableSqlType,
 };
 use crate::sql::{
