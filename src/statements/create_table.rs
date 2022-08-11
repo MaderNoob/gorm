@@ -72,8 +72,8 @@ impl<T: Table> SqlStatement for CreateTableIfNotExistsStatement<T> {
     }
 }
 
-/// Generates the an sql string representing the content of this table, including columns, foreign
-/// keys and unique constraints.
+/// Generates the an sql string representing the content of this table,
+/// including columns, foreign keys and unique constraints.
 fn generate_create_table_content_sql_string(
     fields: &[TableField],
     unique_constraints: &[TableUniqueConstraint],
@@ -99,9 +99,9 @@ fn generate_create_table_content_sql_string(
         write_fields_string_into.push(',');
     }
 
-    for unique_constraint in unique_constraints{
+    for unique_constraint in unique_constraints {
         write_fields_string_into.push_str("UNIQUE(");
-        for field in unique_constraint.fields{
+        for field in unique_constraint.fields {
             write_fields_string_into.push_str(field);
             write_fields_string_into.push(',');
         }

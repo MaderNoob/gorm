@@ -38,7 +38,7 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
                     }
                     _ => {
                         return quote_spanned! {
-                            raw_value.selected_expr.span() => compile_error!("selecting a value without explicitly specifying its name can only be used with paths, like in `person::name`. please add `as <name>` to explicitly specify the name of this selected expression"),
+                            raw_value.selected_expr.span() => compile_error!("selecting a value without explicitly specifying its name can only be used with paths, like in `person::name`. please add `as <name>` to explicitly specify the name of this selected expression");
                         }.into()
                     }
                 }
@@ -48,7 +48,7 @@ pub fn select_values(input_tokens: TokenStream) -> TokenStream {
         // if the name is already used, return an error
         if !names_already_in_use.insert(value.select_as.to_string()) {
             return quote_spanned!{
-                value.selected_expr.span() => compile_error!("can't select 2 values with the same name")
+                value.selected_expr.span() => compile_error!("can't select 2 values with the same name");
             }.into();
         }
 

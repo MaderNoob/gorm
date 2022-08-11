@@ -28,6 +28,7 @@ clap = { version = "3.2.16", features = [
   "derive",
 ], optional = true }
 anyhow = { version = "1.0.60", optional = true }
+bytes = "1.2.1"
 
 [features]
 migration_cli = ["dep:clap", "dep:anyhow"]

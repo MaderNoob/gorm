@@ -26,7 +26,8 @@ use crate::{
     util::{TypedConsListNil, TypesNotEqual},
 };
 
-/// An sql statement which can be built into an sql string and a list of bound parameters.
+/// An sql statement which can be built into an sql string and a list of bound
+/// parameters.
 pub trait SqlStatement: Sized {
     /// The fields of the output of this statement.
     type OutputFields: FieldsConsListItem;
@@ -41,8 +42,8 @@ pub trait SqlStatement: Sized {
     where
         's: 'a;
 
-    /// Builds the statement into a string and a [`ParameterBinder`] which contains a list of all
-    /// bound parameters.
+    /// Builds the statement into a string and a [`ParameterBinder`] which
+    /// contains a list of all bound parameters.
     fn build(&self) -> (String, ParameterBinder) {
         let mut parameter_binder = ParameterBinder::new();
         let mut query_string = String::new();
@@ -67,13 +68,13 @@ pub trait ExecuteSqlStatment: SqlStatement {
 #[async_trait]
 impl<S: SqlStatement> ExecuteSqlStatment for S {}
 
-/// An sql statement which is a query that has an output which can be loaded and parsed.
+/// An sql statement which is a query that has an output which can be loaded and
+/// parsed.
 #[async_trait]
 pub trait LoadSqlStatment: SqlStatement
 where
     (Self::OutputFields, TypedConsListNil): TypesNotEqual,
 {
-
     /// Executes this sql statement and loads the first returned record from
     /// it.
     async fn load_one<O: FromQueryResult<Fields = Self::OutputFields> + Send>(
@@ -105,8 +106,8 @@ where
 #[async_trait]
 impl<S: SqlStatement> LoadSqlStatment for S where (S::OutputFields, TypedConsListNil): TypesNotEqual {}
 
-/// An sql statement which is a query whose output contains only 1 column and can be parsed into a
-/// value.
+/// An sql statement which is a query whose output contains only 1 column and
+/// can be parsed into a value.
 #[async_trait]
 pub trait LoadSingleColumnSqlStatment<
     FieldName: FieldNameCharsConsListItem,

@@ -9,10 +9,11 @@ use crate::{
 
 /// A database transaction from a connection pool.
 ///
-/// The transaction can be commited using the [`DatabaseTransactionFromPool::commit`] function.
+/// The transaction can be commited using the
+/// [`DatabaseTransactionFromPool::commit`] function.
 ///
-/// When the transaction is dropped, if the transaction was not commited, it is automatically
-/// rolled back.
+/// When the transaction is dropped, if the transaction was not commited, it is
+/// automatically rolled back.
 pub struct DatabaseTransactionFromPool<'a> {
     pub(super) transaction: Transaction<'a>,
 }

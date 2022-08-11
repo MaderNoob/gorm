@@ -43,8 +43,8 @@ impl<T: Table> SqlStatement for DropTableStatement<T> {
 ///
 /// This statement doesn't return an error in case the table does not exist.
 ///
-/// This statement can be created by calling the [`DropTableStatement::if_exists`]
-/// function.
+/// This statement can be created by calling the
+/// [`DropTableStatement::if_exists`] function.
 pub struct DropTableIfExistsStatement<T: Table>(PhantomData<T>);
 impl<T: Table> SqlStatement for DropTableIfExistsStatement<T> {
     type OutputFields = TypedConsListNil;

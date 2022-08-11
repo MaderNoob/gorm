@@ -1,10 +1,10 @@
 //! Execution of sql statements.
 //!
-//! This module provides different ways to execute sql statements - connections, transactions,
-//! connection pools.
+//! This module provides different ways to execute sql statements - connections,
+//! transactions, connection pools.
 //!
-//! The [`SqlStatementExecutor`] trait is the core of this module, and this module provides
-//! different types that implement it.
+//! The [`SqlStatementExecutor`] trait is the core of this module, and this
+//! module provides different types that implement it.
 
 use async_trait::async_trait;
 
@@ -29,8 +29,8 @@ pub trait SqlStatementExecutor: Sized + Send + Sync {
     /// Executes the given sql statement.
     async fn execute(&self, statement: impl SqlStatement + Send) -> Result<ExecuteResult>;
 
-    /// Executes the given sql statement and loads the first returned record from
-    /// it.
+    /// Executes the given sql statement and loads the first returned record
+    /// from it.
     async fn load_one<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
         statement: S,
@@ -61,8 +61,8 @@ pub trait SqlStatementExecutor: Sized + Send + Sync {
     // >: SqlStatement<OutputFields = FieldsConsListCons<FieldName, FieldType,
     // TypedConsListNil>>
 
-    /// Executes the given sql statement and loads the first returned record from
-    /// it, if any.
+    /// Executes the given sql statement and loads the first returned record
+    /// from it, if any.
     async fn load_optional<O: FromQueryResult + Send, S: SqlStatement + Send>(
         &self,
         statement: S,

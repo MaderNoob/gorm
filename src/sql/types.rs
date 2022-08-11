@@ -118,8 +118,8 @@ where
     type SqlType = SqlOption<T::SqlType>;
 }
 
-/// An sql type which can be ordered, which means it can be compared with other values of the same
-/// type.
+/// An sql type which can be ordered, which means it can be compared with other
+/// values of the same type.
 pub trait OrderableSqlType {}
 
 macro_rules! mark_sql_types {
@@ -132,14 +132,14 @@ macro_rules! mark_sql_types {
 
 mark_sql_types! {OrderableSqlType => SqlI16, SqlI32, SqlI64, SqlF32, SqlF64, SqlNumeric, Serial16, Serial32, Serial64, SqlText}
 
-/// An sql type which can be averaged, which means that we can find the average of multiple values
-/// of this type.
+/// An sql type which can be averaged, which means that we can find the average
+/// of multiple values of this type.
 pub trait AverageableSqlType {
     type OutputSqlType: SqlType;
 }
 
-/// An sql type which can be summed, which means that we can find the sum of multiple values
-/// of this type.
+/// An sql type which can be summed, which means that we can find the sum of
+/// multiple values of this type.
 pub trait SummableSqlType: SqlAdd<Self> + Sized {
     type OutputSqlType: SqlType;
 }
@@ -188,16 +188,20 @@ macro_rules! mark_sql_types_with_rhs {
     };
 }
 
-/// A marker trait which represents that a value of type `Rhs` can be added to a value of type `Self`.
+/// A marker trait which represents that a value of type `Rhs` can be added to a
+/// value of type `Self`.
 pub trait SqlAdd<Rhs> {}
 
-/// A marker trait which represents that a value of type `Rhs` can be subtracted from a value of type `Self`.
+/// A marker trait which represents that a value of type `Rhs` can be subtracted
+/// from a value of type `Self`.
 pub trait SqlSubtract<Rhs> {}
 
-/// A marker trait which represents that a value of type `Self` can be multiplied by a value of type `Rhs`.
+/// A marker trait which represents that a value of type `Self` can be
+/// multiplied by a value of type `Rhs`.
 pub trait SqlMultiply<Rhs> {}
 
-/// A marker trait which represents that a value of type `Self` can be divided by a value of type `Rhs`.
+/// A marker trait which represents that a value of type `Self` can be divided
+/// by a value of type `Rhs`.
 pub trait SqlDivide<Rhs> {}
 
 macro_rules! mark_all_number_types_with_rhs {

@@ -7,7 +7,7 @@ pub fn update_set(input_tokens: TokenStream) -> TokenStream {
 
     if input.assignments.is_empty() {
         return quote! {
-            compile_error!("the update set can't be empty")
+            compile_error!("the update set can't be empty");
         }
         .into();
     }

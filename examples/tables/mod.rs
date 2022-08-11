@@ -1,29 +1,36 @@
-use gorm::{migration, Table};
+use gorm::{migration, SqlEnum, Table};
 
 #[derive(Debug, Table)]
 #[table(unique(name, age))]
 pub struct Person {
-    id: i32,
-    name: String,
-    age: i32,
+    pub id: i32,
+    pub name: String,
+    pub age: i32,
 
     #[table(foreign_key(School))]
-    school_id: i32,
+    pub school_id: i32,
 
     #[table(foreign_key(Pet))]
-    pet_id: Option<i32>,
+    pub pet_id: Option<i32>,
 }
 
 #[derive(Debug, Table)]
 pub struct School {
-    id: i32,
-    name: String,
+    pub id: i32,
+    pub name: String,
 }
 
-#[derive(Table)]
+#[derive(Clone, SqlEnum, Debug)]
+pub enum PetType {
+    Cat,
+    Dog,
+}
+
+#[derive(Debug, Table)]
 pub struct Pet {
-    id: i32,
-    name: String,
+    pub id: i32,
+    pub name: String,
+    pub ty: PetType,
 }
 
 pub struct CreateTablesMigration;

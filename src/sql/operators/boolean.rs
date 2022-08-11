@@ -70,8 +70,8 @@ impl<S: SelectableTables, E: SqlExpression<S, SqlType = SqlBool>> SqlNot<S, E> {
 impl<S: SelectableTables, E: SqlExpression<S, SqlType = SqlBool>> SqlExpression<S>
     for SqlNot<S, E>
 {
-    type SqlType = E::SqlType;
     type RustType = E::RustType;
+    type SqlType = E::SqlType;
 
     const IS_AGGREGATE: bool = E::IS_AGGREGATE;
 

@@ -2,6 +2,7 @@ mod from_query_result;
 mod migration;
 mod select_values;
 mod selected_value_to_order_by;
+mod sql_enum;
 mod table;
 mod update_set;
 mod util;
@@ -273,17 +274,17 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 /// Unique constraints can be implemented as shown in the example above using
 /// the `#[table(unique(...))]` attribute, and specifying the fields on which
 /// the unique constraint should enforce uniqueness.
-/// 
-/// If you want to add a unique constraint on a single field, you can also add a `#[table(unique)]`
-/// attribute on one of the table struct's fields, for example:
-/// ```rust
+///
+/// If you want to add a unique constraint on a single field, you can also add a
+/// `#[table(unique)]` attribute on one of the table struct's fields, for
+/// example: ```rust
 /// #[derive(Table)]
 /// pub struct Person {
 ///     #[table(unique)]
 ///     full_name: String,
 /// }
 /// ```
-///
+/// 
 /// You can create multiple unique constraints on a single table by adding
 /// multiple `#[table(unique(...))]` attributes to the table struct.
 ///
@@ -291,7 +292,6 @@ pub fn create_field_name_cons_list(item: TokenStream) -> TokenStream {
 ///
 /// Unique constraints allow you to use `ON CONFLICT` clauses, and to perform
 /// upserts, for example, for the above snippet, we can do the following:
-///
 /// ```rust
 /// let upserted_person = person::new {
 ///     first_name: "James",
@@ -360,4 +360,17 @@ pub fn selected_value_to_order_by(input_tokens: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn update_set(input_tokens: TokenStream) -> TokenStream {
     update_set::update_set(input_tokens)
+}
+
+/// Implements the `SqlEnum` trait for some type. This allows using this type as
+/// a field in a table struct, and using it in sql expresions.
+///
+/// All of the enum's variants must be empty, and you can't specify custom
+/// values for some variants.
+///
+/// Also, you must also derive `Debug` and `Clone` on the enum for this derive
+/// macro to work.
+#[proc_macro_derive(SqlEnum)]
+pub fn sql_enum(input_tokens: TokenStream) -> TokenStream {
+    sql_enum::sql_enum(input_tokens)
 }

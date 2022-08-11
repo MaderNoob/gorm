@@ -9,10 +9,11 @@ use crate::{
 
 /// A database transaction.
 ///
-/// The transaction can be commited using the [`DatabaseTransaction::commit`] function.
+/// The transaction can be commited using the [`DatabaseTransaction::commit`]
+/// function.
 ///
-/// When the transaction is dropped, if the transaction was not commited, it is automatically
-/// rolled back.
+/// When the transaction is dropped, if the transaction was not commited, it is
+/// automatically rolled back.
 pub struct DatabaseTransaction<'a> {
     pub(super) transaction: Transaction<'a>,
 }

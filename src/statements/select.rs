@@ -5,8 +5,7 @@ use crate::{
     sql::{
         Column, CombineSelectableTables, CombinedSelectableTables, FieldNameCharsConsListItem,
         FieldsConsListItem, HasForeignKey, ParameterBinder, SelectableTables, SelectedValues,
-        SelectedValuesContainsFieldWithName, SqlExpression, SqlType, Table,
-        TableMarker, SqlBool,
+        SelectedValuesContainsFieldWithName, SqlBool, SqlExpression, SqlType, Table, TableMarker,
     },
     util::{TypedBool, TypedFalse, TypedTrue, TypesEqual},
 };
@@ -386,7 +385,9 @@ impl<
 pub trait Filter: SelectStatement<HasWhereClause = TypedFalse> {
     /// Filters this select statement, so that it only returns records which
     /// match the given condition.
-    fn filter<C: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables, SqlType = SqlBool>>(
+    fn filter<
+        C: SqlExpression<<Self::SelectFrom as SelectFrom>::SelectableTables, SqlType = SqlBool>,
+    >(
         self,
         condition: C,
     ) -> WithWhereClause<Self::SelectFrom, Self, C> {
@@ -840,7 +841,7 @@ where
     A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
     (<<<A::LeftMostTable as HasForeignKey<B::LeftMostTable>>::ForeignKeyColumn as Column>::SqlType as SqlType>::NonNullSqlType, <<B::LeftMostTable as Table>::IdColumn as Column>::SqlType): TypesEqual;
 
-impl<A: SelectFrom, B: SelectFrom> InnerJoined<A, B> 
+impl<A: SelectFrom, B: SelectFrom> InnerJoined<A, B>
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
     A::LeftMostTable: HasForeignKey<B::LeftMostTable>,
@@ -852,8 +853,8 @@ where
     }
 }
 
-// We can select from an inner joined source if there is a foreign key constraint using which we
-// can join the 2 sources.
+// We can select from an inner joined source if there is a foreign key
+// constraint using which we can join the 2 sources.
 impl<A: SelectFrom, B: SelectFrom> SelectFrom for InnerJoined<A, B>
 where
     A::SelectableTables: CombineSelectableTables<B::SelectableTables>,
@@ -884,8 +885,8 @@ where
 
 /// A trait which allows inner joining 2 selection sources using foreign keys.
 pub trait InnerJoinTrait: Sized + SelectFrom {
-    /// Inner joins this selection source with another selection source, if this source has a
-    /// foreign key to the other one.
+    /// Inner joins this selection source with another selection source, if this
+    /// source has a foreign key to the other one.
     fn inner_join<S: SelectFrom>(self, _with: S) -> InnerJoined<Self, S>
     where
         Self::LeftMostTable: HasForeignKey<S::LeftMostTable>,

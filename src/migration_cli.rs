@@ -1,16 +1,17 @@
-use crate::{execution::DatabaseConnection, sql::Migration};
 use anyhow::Context;
 use clap::Parser;
+
+use crate::{execution::DatabaseConnection, sql::Migration};
 
 /// The entry point of a migration cli.
 pub async fn migration_cli_main<M: Migration>(migration: M, database_connection_url: &str) {
     match migration_cli_main_async_fallible(migration, database_connection_url).await {
         Ok(()) => {
             println!("done");
-        }
+        },
         Err(err) => {
             println!("error: {:?}", err);
-        }
+        },
     }
 }
 

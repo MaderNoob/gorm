@@ -16,7 +16,7 @@ pub fn from_query_result(input_tokens: TokenStream) -> TokenStream {
 
     if !generics.params.is_empty() {
         return quote_spanned! {
-            generics.span() => compile_error!("generics are not supported for parsing query results")
+            generics.span() => compile_error!("generics are not supported for parsing query results");
         }
         .into();
     }
@@ -24,7 +24,7 @@ pub fn from_query_result(input_tokens: TokenStream) -> TokenStream {
     let fields = data.take_struct().unwrap();
     if !fields.style.is_struct() {
         return quote_spanned! {
-            derive_input.span() => compile_error!("only named structs are supported for parsing query results")
+            derive_input.span() => compile_error!("only named structs are supported for parsing query results");
         }
         .into();
     }

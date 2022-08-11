@@ -92,11 +92,13 @@
 //!
 //! # Migration Cli
 //!
-//! If you want to create a cli to manage your migration, you can use the `migration_cli` feature
-//! flag. This feature flag will provide you the `migration_cli_main` function which you can call
-//! in your main function and it will take care of the rest.
+//! If you want to create a cli to manage your migration, you can use the
+//! `migration_cli` feature flag. This feature flag will provide you the
+//! `migration_cli_main` function which you can call in your main function and
+//! it will take care of the rest.
 //!
-//! For an example of this, check out the `migration_cli` example in the examples directory.
+//! For an example of this, check out the `migration_cli` example in the
+//! examples directory.
 
 #![feature(auto_traits)]
 #![feature(negative_impls)]
@@ -108,11 +110,13 @@ pub mod statements;
 pub mod util;
 
 pub use async_trait::async_trait;
+pub use bytes;
 pub use deadpool_postgres::tokio_postgres;
 pub use error::*;
 pub use futures;
 pub use gorm_macros::{
-    migration, returning, select_values, selected_value_to_order_by, update_set, FromQueryResult, Table,
+    migration, returning, select_values, selected_value_to_order_by, update_set, FromQueryResult,
+    SqlEnum, Table,
 };
 pub use rust_decimal::Decimal;
 pub use sql::{FromQueryResult, Table};

@@ -30,6 +30,12 @@ pub enum Error {
 
     #[error("there are no records in this table")]
     NoRecords,
+
+    #[error("no variant of enum \"{enum_name}\" for integer value {integer_string}")]
+    NoSuchEnumVariant {
+        enum_name: &'static str,
+        integer_string: String,
+    },
 }
 
 /// A result type with [`enum@Error`] as its error type.

@@ -141,9 +141,9 @@ pub struct DeleteWithWhereClause<
 }
 
 impl<
-        S: DeleteStatement<HasWhereClause = TypedFalse>,
-        C: SqlExpression<S::DeleteFrom, SqlType = SqlBool>,
-    > DeleteStatement for DeleteWithWhereClause<S, C>
+    S: DeleteStatement<HasWhereClause = TypedFalse>,
+    C: SqlExpression<S::DeleteFrom, SqlType = SqlBool>,
+> DeleteStatement for DeleteWithWhereClause<S, C>
 {
     type DeleteFrom = S::DeleteFrom;
     type HasReturningClause = S::HasReturningClause;
@@ -177,9 +177,9 @@ impl<
 }
 
 impl<
-        S: DeleteStatement<HasWhereClause = TypedFalse> + 'static,
-        C: SqlExpression<S::DeleteFrom, SqlType = SqlBool> + 'static,
-    > SqlStatement for DeleteWithWhereClause<S, C>
+    S: DeleteStatement<HasWhereClause = TypedFalse> + 'static,
+    C: SqlExpression<S::DeleteFrom, SqlType = SqlBool> + 'static,
+> SqlStatement for DeleteWithWhereClause<S, C>
 {
     impl_sql_statement_for_delete_statement! {}
 }
@@ -250,9 +250,9 @@ impl<S: DeleteStatement<HasReturningClause = TypedFalse>, R: SelectedValues<S::D
 }
 
 impl<
-        S: DeleteStatement<HasReturningClause = TypedFalse> + 'static,
-        R: SelectedValues<S::DeleteFrom> + 'static,
-    > SqlStatement for DeleteWithReturningClause<S, R>
+    S: DeleteStatement<HasReturningClause = TypedFalse> + 'static,
+    R: SelectedValues<S::DeleteFrom> + 'static,
+> SqlStatement for DeleteWithReturningClause<S, R>
 {
     impl_sql_statement_for_delete_statement! {}
 }

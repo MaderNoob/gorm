@@ -7,6 +7,7 @@ pub trait UniqueConstraint {
     /// The table that this unique constraint belongs to.
     type Table: Table;
 
-    /// A comma seperated list of field names that this unique constraint enforces uniqueness on.
-    const FIELDS_COMMA_SEPERATED:&'static str;
+    /// A comma seperated list of field names that this unique constraint
+    /// enforces uniqueness on.
+    const FIELDS_COMMA_SEPERATED: &'static str;
 }

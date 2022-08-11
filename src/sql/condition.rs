@@ -1,8 +1,7 @@
 use std::{fmt::Write, marker::PhantomData};
 
-use crate::sql::{OrderableSqlType, ParameterBinder, SelectableTables, SqlBool, SqlExpression};
-
 use super::SqlText;
+use crate::sql::{OrderableSqlType, ParameterBinder, SelectableTables, SqlBool, SqlExpression};
 
 /// Defines an operator condition struct.
 macro_rules! define_operator_condition{

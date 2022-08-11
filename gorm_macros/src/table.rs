@@ -30,7 +30,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
     if !generics.params.is_empty() {
         return quote_spanned! {
-            generics.span() => compile_error!("generics are not supported on tables")
+            generics.span() => compile_error!("generics are not supported on tables");
         }
         .into();
     }
@@ -38,7 +38,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
     let fields = data.take_struct().unwrap();
     if !fields.style.is_struct() {
         return quote_spanned! {
-            derive_input.span() => compile_error!("only named structs are supported for tables")
+            derive_input.span() => compile_error!("only named structs are supported for tables");
         }
         .into();
     }
@@ -77,7 +77,7 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             if !field_names_strings_set.contains(field_name) {
                 let span = span.clone();
                 return quote_spanned! {
-                    span => compile_error!("no such field"),
+                    span => compile_error!("no such field");
                 }
                 .into();
             }
@@ -174,6 +174,8 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
 
         #[allow(non_camel_case_types)]
         pub mod #table_name_ident {
+            use super::*;
+
             #(
                 #column_structs
              )*
@@ -185,6 +187,8 @@ pub fn table(input_tokens: TokenStream) -> TokenStream {
             #all_fields_selected_struct
 
             pub mod unique_constraints {
+                use super::super::*;
+
                 pub struct id;
 
                 #[automatically_derived]

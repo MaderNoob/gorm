@@ -2,10 +2,7 @@ mod connection;
 mod transaction;
 
 pub use connection::*;
-use deadpool_postgres::{
-    tokio_postgres::NoTls,
-    Manager, ManagerConfig, Object, Pool,
-};
+use deadpool_postgres::{tokio_postgres::NoTls, Manager, ManagerConfig, Object, Pool};
 pub use transaction::*;
 
 use crate::{
@@ -17,8 +14,8 @@ use crate::{
 
 /// A database connection pool.
 ///
-/// You can execute statements direclty on the pool, or get a connection from the pool using the
-/// [`DatabaseConnectionPool::get`] function.
+/// You can execute statements direclty on the pool, or get a connection from
+/// the pool using the [`DatabaseConnectionPool::get`] function.
 pub struct DatabaseConnectionPool {
     pool: Pool,
 }

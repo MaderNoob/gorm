@@ -1,10 +1,11 @@
+use super::FieldNameCharsConsListItem;
 use crate::{
     sql::{FieldsConsListItem, IntoSqlType, SqlType},
-    statements::{CreateTableStatement, DropTableStatement, EmptyDeleteStatement, EmptyUpdateStatement},
+    statements::{
+        CreateTableStatement, DropTableStatement, EmptyDeleteStatement, EmptyUpdateStatement,
+    },
     util::TypesEqual,
 };
-
-use super::FieldNameCharsConsListItem;
 
 /// A table in the database.
 pub trait Table: Sized + 'static {
@@ -34,8 +35,9 @@ pub struct TableField {
 
     /// Does this field have a unique constraint on it?
     pub is_unique: bool,
-    
-    /// The name of the table which this field has a foreign key constraint to, if any.
+
+    /// The name of the table which this field has a foreign key constraint to,
+    /// if any.
     pub foreign_key_to_table_name: Option<&'static str>,
 
     /// The sql string representation of this field's sql type.
@@ -69,8 +71,8 @@ pub trait Column {
     type RustType: IntoSqlType<SqlType = Self::SqlType>;
 }
 
-/// A trait for representing a table marker, which is an empty struct type which is
-/// used to reference some table.
+/// A trait for representing a table marker, which is an empty struct type which
+/// is used to reference some table.
 pub trait TableMarker: Sized + 'static {
     /// The table referenced by this table marker.
     type Table: Table;

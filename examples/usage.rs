@@ -40,20 +40,25 @@ async fn main() -> anyhow::Result<()> {
         .execute(&pool)
         .await?;
 
-    let second_school = school::new { name: "Marble Hills School" }
-        .insert()
-        .returning(school::id)
-        .load_one_value(&pool)
-        .await?;
-
-    let pet_id = pet::new_with_id {
-        name: "Kitty",
-        id: &5,
+    let second_school = school::new {
+        name: "Marble Hills School",
     }
     .insert()
-    .returning(pet::id)
+    .returning(school::id)
     .load_one_value(&pool)
     .await?;
+
+    let inserted_pet = pet::new_with_id {
+        name: "Kitty",
+        id: &5,
+        ty: &PetType::Dog,
+    }
+    .insert()
+    .returning(pet::all)
+    .load_one::<Pet>(&pool)
+    .await?;
+
+    println!("inserted pet: {:?}", inserted_pet);
 
     person::new {
         name: "James",
@@ -104,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
         name: "Jake",
         age: &29,
         school_id: &1,
-        pet_id: &Some(pet_id),
+        pet_id: &Some(inserted_pet.id),
     }
     .insert()
     .returning(person::all)

@@ -34,14 +34,15 @@ impl<'a> ParameterBinder<'a> {
         result
     }
 
-    /// Returns a reference to the list of parameters bound to this parameter binder.
+    /// Returns a reference to the list of parameters bound to this parameter
+    /// binder.
     pub fn parameters(&self) -> &[&'a (dyn ToSql + Sync)] {
         &self.parameters
     }
 }
 
-/// A struct which implements the [`std::fmt::Display`] trait and allows formatting a bound
-/// parameter's sql identifier ($1..$N).
+/// A struct which implements the [`std::fmt::Display`] trait and allows
+/// formatting a bound parameter's sql identifier ($1..$N).
 pub struct DisplayableBoundParameterDollarN {
     n: usize,
 }
